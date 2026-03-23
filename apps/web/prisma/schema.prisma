@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  name String
+  // Optional store abbreviation used in filenames (e.g. BST, SCVW).
+  abbreviation String?
+  // Optional IANA timezone for correct business-date interpretation later.
+  timezone String?
+
+  advisors       Advisor[]
+  ingestionRuns  IngestionRun[]
+  ingestedFiles  IngestedFile[]
+  rawReportRows  RawReportRow[]
+  dailyMetrics   AdvisorDailyMetrics[]
+  dailyCommodity AdvisorDailyCommodity[]
+
+  @@unique([abbreviation])
+}
+
+model Advisor {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  storeId        String
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  nameNormalized String
+  nameRaw        String?
+
+  dailyMetrics   AdvisorDailyMetrics[]
+  dailyCommodity AdvisorDailyCommodity[]
+
+  @@unique([storeId, nameNormalized])
+  @@index([storeId])
+}
+
+model IngestionRun {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  storeId      String
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  businessDate DateTime
+  // Per-store serial number for each upload batch (monotonic increasing).
+  batchNo      Int
+
+  status       String   @default("COMPLETED") // COMPLETED | COMPLETED_WITH_WARNINGS | FAILED
+  warnings     Json?
+  errors       Json?
+  summary      Json?
+
+  files        IngestedFile[]
+  rawReportRows RawReportRow[]
+
+  @@unique([storeId, batchNo])
+  @@index([storeId, businessDate])
+}
+
+model IngestedFile {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  runId          String
+  run            IngestionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  storeId        String
+  store          Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  businessDate   DateTime
+
+  originalFilename String
+  sha256           String
+  byteSize         Int?
+
+  detectedType       String?
+  detectionConfidence Float?
+  rawMeta             Json?
+
+  parseWarnings Json?
+  parseErrors   Json?
+
+  rawRows RawReportRow[]
+
+  @@index([runId])
+  @@index([storeId, businessDate])
+  @@unique([runId, sha256])
+}
+
+model RawReportRow {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  storeId      String
+  store        Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  runId        String
+  run          IngestionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  ingestedFileId String
+  ingestedFile   IngestedFile @relation(fields: [ingestedFileId], references: [id], onDelete: Cascade)
+  businessDate  DateTime
+
+  rowIndex Int
+  rowHash  String
+  data     Json
+
+  @@unique([ingestedFileId, rowIndex])
+  @@index([storeId, businessDate])
+  @@index([ingestedFileId])
+  @@index([rowHash])
+}
+
+model AdvisorDailyMetrics {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  storeId      String
+  store        Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  advisorId    String
+  advisor      Advisor @relation(fields: [advisorId], references: [id], onDelete: Cascade)
+  businessDate DateTime
+
+  // RO Count report
+  openRos Int @default(0)
+
+  // Menu Sales
+  menuCount      Int   @default(0)
+  menuLaborGross Float @default(0)
+  menuPartsGross Float @default(0)
+
+  // A-La-Carte
+  alaCount      Int   @default(0)
+  alaLaborGross Float @default(0)
+  alaPartsGross Float @default(0)
+
+  // Recommendations
+  recCount      Int   @default(0)
+  recSoldCount  Int   @default(0)
+  recAmount     Float @default(0)
+  recSoldAmount Float @default(0)
+
+  // Daily Data
+  dailyLaborGross Float @default(0)
+  dailyPartsGross Float @default(0)
+
+  meta Json?
+
+  @@unique([storeId, advisorId, businessDate])
+  @@index([storeId, businessDate])
+  @@index([storeId, advisorId, businessDate])
+}
+
+model AdvisorDailyCommodity {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  storeId      String
+  store        Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  advisorId    String
+  advisor      Advisor @relation(fields: [advisorId], references: [id], onDelete: Cascade)
+  businessDate DateTime
+
+  commodityKey String
+  qty          Float @default(0)
+  gross        Float @default(0)
+  laborGross   Float @default(0)
+
+  meta Json?
+
+  @@unique([storeId, advisorId, businessDate, commodityKey])
+  @@index([storeId, businessDate])
+  @@index([storeId, advisorId, businessDate])
+}
+
+

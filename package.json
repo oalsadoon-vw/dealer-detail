@@ -1,0 +1,11 @@
+{
+  "name": "dealer_detail_mvp",
+  "private": true,
+  "scripts": {
+    "dev:web": "npm --prefix apps/web run dev",
+    "seed:web": "npm --prefix apps/web run seed",
+    "classify:excels": "npm --prefix apps/web run classify:excels"
+  }
+}
+
+
