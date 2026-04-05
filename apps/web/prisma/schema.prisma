@@ -23,6 +23,7 @@ model Store {
   rawReportRows  RawReportRow[]
   dailyMetrics   AdvisorDailyMetrics[]
   dailyCommodity AdvisorDailyCommodity[]
+  emailSources   EmailSource[]
 
   @@unique([abbreviation])
 }
@@ -177,4 +178,18 @@ model AdvisorDailyCommodity {
   @@index([storeId, advisorId, businessDate])
 }
 
+model EmailSource {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
 
+  storeId         String
+  store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  senderEmail     String
+  subjectPattern  String?
+  isActive        Boolean  @default(true)
+  lastProcessedAt DateTime?
+
+  @@index([senderEmail])
+  @@index([storeId])
+}

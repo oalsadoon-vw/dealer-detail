@@ -33,3 +33,5 @@ apps/web/node_modules/.prisma/
 # IDE
 .vscode/
 .idea/
+
+excels/

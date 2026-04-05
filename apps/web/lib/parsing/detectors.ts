@@ -54,6 +54,11 @@ export function detectReportType(args: {
   const hasOpcode = hasAny(h, ["opcode labor gross", "opcode parts gross", "operation opcode"]);
   const hasAnyGross = [...h].some((x) => x.includes("gross"));
   const hasAdvisorNameLike = [...h].some((x) => x.includes("advisor") && x.includes("name"));
+  // A La Carte exclusive signals: "Job Total Discount" and "Opcode Total Gross" never appear in Menu Sales or RO Count
+  const hasJobTotalDiscount = h.has("job total discount") || hasTwoWord(h, "job", "discount");
+  const hasOpcodeTotal = h.has("opcode total gross") || hasColLike(h, ["opcode", "total", "gross"]);
+  // Menu Sales / RO Count signal: vehicle-level columns absent from A La Carte
+  const hasVehicleInfo = hasAny(h, ["year", "model", "mileage in", "mileage"]);
 
   // 1. High Priority Overrides (Alignment)
   const isAlignmentFilename = fname.includes("alignment") || fkey.includes("alignment") || sname.includes("alignment");
@@ -118,10 +123,15 @@ export function detectReportType(args: {
     }
   }
 
-  // Tires
+  // Tires — some exports are summary-only sheets with only SUM gross columns at row 0;
+  // those will be re-scored at a later rangeStart by the pipeline, but we still give a
+  // lower-confidence filename-only match so the pipeline can rank it above unknown.
   const isTireFilename = fkey.includes("tire") || fname.includes("tire") || sname.includes("tire");
   if (isTireFilename && hasAdvisorNameLike && hasAnyGross) {
     return { type: "tires", confidence: 0.9, notes: ["Matched tires via filename hint"] };
+  }
+  if (isTireFilename && hasAnyGross) {
+    return { type: "tires", confidence: 0.75, notes: ["Matched tires via filename + gross (summary sheet)"] };
   }
 
   // 3. Header-Only Fallbacks (for generic filenames like "Export.xlsx")
@@ -137,8 +147,17 @@ export function detectReportType(args: {
     return { type: "dailyDataNew", confidence: 0.85, notes: ["Matched new daily data columns"] };
   }
 
+  // A La Carte has exclusive signals not found in Menu Sales or RO Count reports.
+  // Must be checked BEFORE the generic Opcode+RO catch below, because A La Carte
+  // files also carry an RO Number column which would otherwise route them to menuSales.
+  if (hasAdvisorName && hasOpcode && (hasJobTotalDiscount || hasOpcodeTotal) && !hasVehicleInfo) {
+    return { type: "alaCarte", confidence: 0.85, notes: ["Matched alaCarte via Job Total Discount / Opcode Total Gross"] };
+  }
+
   if (hasAdvisorName && hasOpcode && hasRoNumber) {
-    // If we have RO Number and Opcode and Advisor, it's very likely Menu Sales
+    // Vehicle-info columns (Year, Model, Mileage) are present in Menu Sales but not in RO Count;
+    // without a filename hint both look identical at the header level so we keep menuSales as the
+    // safer default for opcode-detail reports that pass through here.
     return { type: "menuSales", confidence: 0.7, notes: ["Ambiguous: Resolved as menuSales based on Opcode+RO"] };
   }
 
@@ -161,26 +180,41 @@ export function detectReportType(args: {
 
 export function inferCommodityKeyFromFilename(filename: string): string | null {
   const f = filenameLower(filename);
+
+  // Longer / more-specific patterns must come before shorter sub-strings to avoid
+  // early-exit on partial matches (e.g. "factory chemical" before "chemical").
   const mapping: Array<[string, string]> = [
+    // Factory chemicals (before generic "chemical")
+    ["factory chemical", "factory_chemicals"],
+    ["factory chemicals", "factory_chemicals"],
+    // Non-factory fluids — keep distinct from factory chemicals
+    ["non-factory fluid", "fluids"],
+    ["non factory fluid", "fluids"],
+    // Air / cabin filters — specific before generic "filter"
     ["air filter", "air_filters"],
     ["air filters", "air_filters"],
     ["cabin filter", "cabin_filters"],
     ["cabin filters", "cabin_filters"],
+    // Batteries
     ["battery", "batteries"],
     ["batteries", "batteries"],
+    // Brakes
     ["brake", "brakes"],
     ["brakes", "brakes"],
+    // Alignments
     ["alignment", "alignments"],
     ["alignments", "alignments"],
+    // Wipers
     ["wiper", "wipers"],
     ["wipers", "wipers"],
+    // Belts
     ["belt", "belts"],
     ["belts", "belts"],
-    ["fluid", "fluids"],
-    ["fluids", "fluids"],
-    ["factory chemical", "factory_chemicals"],
-    ["factory chemicals", "factory_chemicals"],
+    // Generic chemical fallback (after factory chemical)
     ["chemical", "factory_chemicals"],
+    // Generic fluid fallback (after non-factory fluid)
+    ["fluid", "fluids"],
+    // Tires
     ["tires", "tires"],
     ["tire", "tires"]
   ];
