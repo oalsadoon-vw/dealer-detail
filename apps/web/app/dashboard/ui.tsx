@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { computeFullPicture } from "@/lib/fullPicture";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { BarChart } from "@/components/charts/BarChart";
 import { PieChart } from "@/components/charts/PieChart";
+import { AdvisorDrawer } from "@/components/AdvisorDrawer";
 
 // --- Types ---
 
@@ -147,6 +148,19 @@ function Td({ children, className }: { children: React.ReactNode; className?: st
   );
 }
 
+function AdvisorName({ name, onClick }: { name: string; onClick: () => void }) {
+  return (
+    <Td className="pl-6">
+      <button
+        onClick={onClick}
+        className="font-medium text-zinc-900 hover:text-indigo-600 transition-colors underline decoration-transparent hover:decoration-indigo-400 underline-offset-2 text-left"
+      >
+        {name}
+      </button>
+    </Td>
+  );
+}
+
 export default function DashboardClient() {
   const [stores, setStores] = useState<Store[]>([]);
   const [storeId, setStoreId] = useState<string>("");
@@ -159,6 +173,9 @@ export default function DashboardClient() {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [selectedAdvisor, setSelectedAdvisor] = useState<{ id: string; name: string } | null>(null);
+  const openAdvisor = useCallback((id: string, name: string) => setSelectedAdvisor({ id, name }), []);
 
   useEffect(() => {
     fetch("/api/stores")
@@ -300,7 +317,31 @@ export default function DashboardClient() {
     return map;
   }, [data]);
 
-  const series = data?.dailySeries ?? [];
+  const series = useMemo(() => {
+    const raw = data?.dailySeries ?? [];
+    if (!startDate || !endDate) return raw;
+
+    const lookup = new Map(raw.map((d) => [d.date, d]));
+    const filled: typeof raw = [];
+    const cur = new Date(`${startDate}T00:00:00Z`);
+    const end = new Date(`${endDate}T00:00:00Z`);
+
+    while (cur <= end) {
+      const key = cur.toISOString().slice(0, 10);
+      filled.push(
+        lookup.get(key) ?? {
+          date: key,
+          openRos: 0,
+          dailyGross: 0,
+          commodityQty: 0,
+          commodityGross: 0
+        }
+      );
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return filled;
+  }, [data, startDate, endDate]);
+
   const commodityMix = data?.commodityMix ?? [];
 
   return (
@@ -484,7 +525,7 @@ export default function DashboardClient() {
                   <tbody className="divide-y divide-zinc-100 bg-white">
                     {fullPictureRows.map(({ a, fp }) => (
                       <tr key={a.advisorId} className="hover:bg-zinc-50/50 transition-colors">
-                        <Td className="pl-6 font-medium text-zinc-900">{a.advisorName}</Td>
+                        <AdvisorName name={a.advisorName} onClick={() => openAdvisor(a.advisorId, a.advisorName)} />
                         <Td>{fmtCount(a.metrics.openRos)}</Td>
                         <Td>{pct(fp.menuSalesPct)} <span className="text-zinc-400 text-xs ml-1">({fmtCount(a.metrics.menuCount)})</span></Td>
                         <Td>{pct(fp.alaPct)} <span className="text-zinc-400 text-xs ml-1">({fmtCount(a.metrics.alaCount)})</span></Td>
@@ -534,7 +575,7 @@ export default function DashboardClient() {
                 <tbody>
                   {(data?.advisors ?? []).map((a) => (
                     <tr key={a.advisorId} className="hover:bg-zinc-50/50">
-                      <Td className="pl-6 font-medium text-zinc-900">{a.advisorName}</Td>
+                      <AdvisorName name={a.advisorName} onClick={() => openAdvisor(a.advisorId, a.advisorName)} />
                       <Td>{fmtCount(a.metrics.menuCount)}</Td>
                       <Td>{fmtMoney(a.metrics.menuLaborGross)}</Td>
                       <Td>{fmtMoney(a.metrics.menuPartsGross)}</Td>
@@ -569,7 +610,7 @@ export default function DashboardClient() {
                 <tbody>
                   {(data?.advisors ?? []).map((a) => (
                     <tr key={a.advisorId} className="hover:bg-zinc-50/50">
-                      <Td className="pl-6 font-medium text-zinc-900">{a.advisorName}</Td>
+                      <AdvisorName name={a.advisorName} onClick={() => openAdvisor(a.advisorId, a.advisorName)} />
                       <Td>{fmtCount(a.metrics.alaCount)}</Td>
                       <Td>{fmtMoney(a.metrics.alaLaborGross)}</Td>
                       <Td>{fmtMoney(a.metrics.alaPartsGross)}</Td>
@@ -656,7 +697,7 @@ export default function DashboardClient() {
                     const close = a.metrics.recAmount === 0 ? 0 : a.metrics.recSoldAmount / a.metrics.recAmount;
                     return (
                       <tr key={a.advisorId} className="hover:bg-zinc-50/50">
-                        <Td className="pl-6 font-medium text-zinc-900">{a.advisorName}</Td>
+                        <AdvisorName name={a.advisorName} onClick={() => openAdvisor(a.advisorId, a.advisorName)} />
                         <Td>{fmtCount(a.metrics.recCount)}</Td>
                         <Td>{fmtCount(a.metrics.recSoldCount)}</Td>
                         <Td>
@@ -690,7 +731,7 @@ export default function DashboardClient() {
               <tbody>
                 {(data?.advisors ?? []).map((a) => (
                   <tr key={a.advisorId} className="hover:bg-zinc-50/50">
-                    <Td className="pl-6 font-medium text-zinc-900">{a.advisorName}</Td>
+                    <AdvisorName name={a.advisorName} onClick={() => openAdvisor(a.advisorId, a.advisorName)} />
                     <Td>{money(a.metrics.dailyLaborGross)}</Td>
                     <Td>{money(a.metrics.dailyPartsGross)}</Td>
                     <Td className="text-right pr-6 font-medium">{money(a.metrics.dailyLaborGross + a.metrics.dailyPartsGross)}</Td>
@@ -701,6 +742,17 @@ export default function DashboardClient() {
           </TableContainer>
         )}
       </div>
+
+      {selectedAdvisor && (
+        <AdvisorDrawer
+          advisorId={selectedAdvisor.id}
+          advisorName={selectedAdvisor.name}
+          storeId={storeId}
+          startDate={startDate}
+          endDate={endDate}
+          onClose={() => setSelectedAdvisor(null)}
+        />
+      )}
     </main>
   );
 }
