@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/auth/api-guard";
+import { requireStoreAccess } from "@/lib/server/authz";
 
 export const runtime = "nodejs";
 
@@ -37,7 +39,7 @@ function daysInclusive(start: Date, end: Date) {
   return Math.max(1, days);
 }
 
-export async function GET(req: Request) {
+export const GET = withAuth(async (req, _ctx, tc) => {
   try {
     const url = new URL(req.url);
     const runId = url.searchParams.get("runId") ?? undefined;
@@ -103,6 +105,8 @@ export async function GET(req: Request) {
         run = null;
       }
     }
+
+    requireStoreAccess(tc, store!.id);
 
     const metrics = await prisma.advisorDailyMetrics.findMany({
       where: range
@@ -345,6 +349,6 @@ export async function GET(req: Request) {
   } catch (e) {
     return NextResponse.json({ error: "Dashboard query failed", details: String(e) }, { status: 500 });
   }
-}
+});
 
 

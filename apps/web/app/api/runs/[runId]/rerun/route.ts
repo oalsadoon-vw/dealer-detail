@@ -1,23 +1,24 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-
-import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/auth/api-guard";
+import { requireManagerOrHigher, requireRunAccess } from "@/lib/server/authz";
 
 export const runtime = "nodejs";
 
-export async function POST(_req: Request, ctx: { params: { runId: string } }) {
-    const parsed = z.string().uuid().safeParse(ctx.params.runId);
-    if (!parsed.success) return NextResponse.json({ error: "Invalid runId" }, { status: 400 });
+type RouteCtx = { params: { runId: string } };
 
-    const run = await prisma.ingestionRun.findUnique({
-        where: { id: ctx.params.runId },
-        select: { storeId: true, businessDate: true }
-    });
+export const POST = withAuth<RouteCtx>(async (_req, ctx, tc) => {
+  const parsed = z.string().uuid().safeParse(ctx.params.runId);
+  if (!parsed.success)
+    return NextResponse.json({ error: "Invalid runId" }, { status: 400 });
 
-    if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  requireManagerOrHigher(tc);
+  const run = await requireRunAccess(tc, ctx.params.runId);
 
-    const { reaggregateStoreDate } = await import("@/lib/parsing/reaggregation");
-    await reaggregateStoreDate(run.storeId, run.businessDate);
+  const { reaggregateStoreDate } = await import(
+    "@/lib/parsing/reaggregation"
+  );
+  await reaggregateStoreDate(run.storeId, run.businessDate);
 
-    return NextResponse.json({ success: true });
-}
+  return NextResponse.json({ success: true });
+});

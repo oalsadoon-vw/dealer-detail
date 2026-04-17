@@ -1,42 +1,42 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-
 import { prisma } from "@/lib/db";
+import { withAuth } from "@/lib/auth/api-guard";
+import { requireManagerOrHigher, requireRunAccess } from "@/lib/server/authz";
 
 export const runtime = "nodejs";
 
-export async function GET(_req: Request, ctx: { params: { runId: string } }) {
+type RouteCtx = { params: { runId: string } };
+
+export const GET = withAuth<RouteCtx>(async (_req, ctx, tc) => {
   const parsed = z.string().uuid().safeParse(ctx.params.runId);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid runId" }, { status: 400 });
+  if (!parsed.success)
+    return NextResponse.json({ error: "Invalid runId" }, { status: 400 });
+
+  await requireRunAccess(tc, ctx.params.runId);
 
   const run = await prisma.ingestionRun.findUnique({
     where: { id: ctx.params.runId },
-    include: { files: true, store: true }
+    include: { files: true, store: true },
   });
 
-  if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(run);
-}
+});
 
-export async function DELETE(_req: Request, ctx: { params: { runId: string } }) {
+export const DELETE = withAuth<RouteCtx>(async (_req, ctx, tc) => {
   const parsed = z.string().uuid().safeParse(ctx.params.runId);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid runId" }, { status: 400 });
+  if (!parsed.success)
+    return NextResponse.json({ error: "Invalid runId" }, { status: 400 });
 
-  const run = await prisma.ingestionRun.findUnique({
-    where: { id: ctx.params.runId },
-    select: { storeId: true, businessDate: true }
-  });
+  requireManagerOrHigher(tc);
+  const run = await requireRunAccess(tc, ctx.params.runId);
 
-  if (!run) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  await prisma.ingestionRun.delete({ where: { id: ctx.params.runId } });
 
-  // 2. Delete the run (cascades to IngestedFile, RawReportRow)
-  await prisma.ingestionRun.delete({
-    where: { id: ctx.params.runId }
-  });
-
-  // 3. RE-AGGREGATE remaining runs for this day to fix the metrics
-  const { reaggregateStoreDate } = await import("@/lib/parsing/reaggregation");
+  const { reaggregateStoreDate } = await import(
+    "@/lib/parsing/reaggregation"
+  );
   await reaggregateStoreDate(run.storeId, run.businessDate);
 
   return NextResponse.json({ success: true });
-}
+});

@@ -36,5 +36,4 @@ apps/web/node_modules/.prisma/
 
 excels/
 
-# Internal architecture planning docs
-docs/architecture/
+docs/

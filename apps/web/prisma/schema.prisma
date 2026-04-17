@@ -8,14 +8,117 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ---------------------------------------------------------------------------
+// Multi-tenant identity & access models
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name String
+  slug String @unique
+
+  logoUrl  String?
+  settings Json?
+
+  stores      Store[]
+  memberships Membership[]
+  invites     Invite[]
+}
+
+model Profile {
+  id        String   @id // matches Supabase auth.users.id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  email     String
+  fullName  String?
+  avatarUrl String?
+
+  memberships    Membership[]
+  invitesSent    Invite[]       @relation("InvitedBy")
+  platformAdmin  PlatformAdmin?
+}
+
+model PlatformAdmin {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  profileId String  @unique
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  grantedBy String?
+  notes     String?
+}
+
+model Membership {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  profileId      String
+  profile        Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  role String // org_admin | store_admin | manager | viewer
+
+  storeMemberships StoreMembership[]
+
+  @@unique([organizationId, profileId])
+  @@index([profileId])
+}
+
+model StoreMembership {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  membershipId String
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  storeId      String
+  store        Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, storeId])
+  @@index([storeId])
+}
+
+model Invite {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  email    String
+  role     String // org_admin | store_admin | manager | viewer
+  storeIds String[] @default([])
+
+  invitedById String
+  invitedBy   Profile @relation("InvitedBy", fields: [invitedById], references: [id])
+
+  token     String    @unique @default(uuid())
+  expiresAt DateTime
+  acceptedAt DateTime?
+
+  @@index([email])
+  @@index([token])
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Core business models
+// ---------------------------------------------------------------------------
+
 model Store {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
   name String
-  // Optional store abbreviation used in filenames (e.g. BST, SCVW).
   abbreviation String?
-  // Optional IANA timezone for correct business-date interpretation later.
   timezone String?
 
   advisors       Advisor[]
@@ -25,8 +128,10 @@ model Store {
   dailyMetrics   AdvisorDailyMetrics[]
   dailyCommodity AdvisorDailyCommodity[]
   emailSources   EmailSource[]
+  storeMemberships StoreMembership[]
 
   @@unique([abbreviation])
+  @@index([organizationId])
 }
 
 model Advisor {
@@ -52,7 +157,6 @@ model IngestionRun {
   storeId      String
   store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   businessDate DateTime
-  // Per-store serial number for each upload batch (monotonic increasing).
   batchNo      Int
 
   status       String   @default("COMPLETED") // COMPLETED | COMPLETED_WITH_WARNINGS | FAILED
@@ -127,26 +231,21 @@ model AdvisorDailyMetrics {
   advisor      Advisor @relation(fields: [advisorId], references: [id], onDelete: Cascade)
   businessDate DateTime
 
-  // RO Count report
   openRos Int @default(0)
 
-  // Menu Sales
   menuCount      Int   @default(0)
   menuLaborGross Float @default(0)
   menuPartsGross Float @default(0)
 
-  // A-La-Carte
   alaCount      Int   @default(0)
   alaLaborGross Float @default(0)
   alaPartsGross Float @default(0)
 
-  // Recommendations
   recCount      Int   @default(0)
   recSoldCount  Int   @default(0)
   recAmount     Float @default(0)
   recSoldAmount Float @default(0)
 
-  // Daily Data
   dailyLaborGross Float @default(0)
   dailyPartsGross Float @default(0)
 
@@ -193,4 +292,26 @@ model EmailSource {
 
   @@index([senderEmail])
   @@index([storeId])
+}
+
+// ---------------------------------------------------------------------------
+// Audit log — append-only record of sensitive admin actions
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  actorId    String
+  actorEmail String
+  action     String  // e.g. org.create, store.create, member.role_change, member.remove, invite.create
+  targetType String  // e.g. organization, store, membership, invite
+  targetId   String
+
+  organizationId String?
+  metadata       Json?
+
+  @@index([organizationId, createdAt])
+  @@index([actorId])
+  @@index([action])
 }
