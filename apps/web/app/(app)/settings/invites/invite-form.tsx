@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState } from "react";
 import { createInviteAction } from "@/lib/server/actions/org-admin";
 import { MEMBERSHIP_ROLES } from "@/lib/types/auth";
 
@@ -14,17 +14,22 @@ const ROLE_HINTS: Record<string, string> = {
 };
 
 export function InviteForm({ stores }: { stores: Store[] }) {
-  const [state, formAction, pending] = useActionState(
-    async (_prev: { error?: string; ok?: boolean } | null, formData: FormData) => {
-      const result = await createInviteAction(formData);
-      if (!result.ok) return { error: result.error };
-      return { ok: true };
-    },
-    null
-  );
+  const [state, setState] = useState<{ error?: string; ok?: boolean } | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPending(true);
+    setState(null);
+    const formData = new FormData(e.currentTarget);
+    const result = await createInviteAction(formData);
+    if (!result.ok) setState({ error: result.error });
+    else setState({ ok: true });
+    setPending(false);
+  }
 
   return (
-    <form action={formAction} className="space-y-4 max-w-lg">
+    <form onSubmit={handleSubmit} className="space-y-4 max-w-lg">
       <label className="block space-y-1">
         <span className="text-sm text-zinc-600">Email</span>
         <input

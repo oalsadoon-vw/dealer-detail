@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useState } from "react";
 import { createOrganizationAction } from "@/lib/server/actions/admin";
 
 export default function CreateOrganizationPage() {
@@ -23,17 +23,21 @@ export default function CreateOrganizationPage() {
 }
 
 function CreateOrgForm() {
-  const [state, formAction, pending] = useActionState(
-    async (_prev: { error: string } | null, formData: FormData) => {
-      const result = await createOrganizationAction(formData);
-      if (!result.ok) return { error: result.error };
-      return null;
-    },
-    null
-  );
+  const [state, setState] = useState<{ error: string } | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPending(true);
+    setState(null);
+    const formData = new FormData(e.currentTarget);
+    const result = await createOrganizationAction(formData);
+    if (!result.ok) setState({ error: result.error });
+    setPending(false);
+  }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <label className="block space-y-1">
         <span className="text-sm text-zinc-400">Organization name</span>
         <input

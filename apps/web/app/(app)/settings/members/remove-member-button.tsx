@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState } from "react";
 import { removeMemberAction } from "@/lib/server/actions/org-admin";
 
 export function RemoveMemberButton({
@@ -10,21 +10,25 @@ export function RemoveMemberButton({
   membershipId: string;
   name: string;
 }) {
-  const [state, formAction, pending] = useActionState(
-    async (_prev: { error: string } | null, formData: FormData) => {
-      if (!confirm(`Remove ${name} from this organization? They will lose all access.`)) return null;
-      formData.set("membershipId", membershipId);
-      const result = await removeMemberAction(formData);
-      if (!result.ok) return { error: result.error };
-      return null;
-    },
-    null
-  );
+  const [state, setState] = useState<{ error: string } | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function handleClick() {
+    if (!confirm(`Remove ${name} from this organization? They will lose all access.`)) return;
+    setPending(true);
+    setState(null);
+    const formData = new FormData();
+    formData.set("membershipId", membershipId);
+    const result = await removeMemberAction(formData);
+    if (!result.ok) setState({ error: result.error });
+    setPending(false);
+  }
 
   return (
-    <form action={formAction}>
+    <div>
       <button
-        type="submit"
+        type="button"
+        onClick={handleClick}
         disabled={pending}
         className="text-xs text-red-600 hover:text-red-800 underline disabled:opacity-50"
       >
@@ -33,6 +37,6 @@ export function RemoveMemberButton({
       {state?.error && (
         <div className="text-[10px] text-red-600 mt-1">{state.error}</div>
       )}
-    </form>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState } from "react";
 import { updateStoreAssignmentsAction } from "@/lib/server/actions/org-admin";
 
 type Store = { id: string; name: string; abbreviation: string | null };
@@ -14,18 +14,23 @@ export function StoreAssignmentForm({
   stores: Store[];
   assignedStoreIds: string[];
 }) {
-  const [state, formAction, pending] = useActionState(
-    async (_prev: { error: string; ok?: boolean } | null, formData: FormData) => {
-      formData.set("membershipId", membershipId);
-      const result = await updateStoreAssignmentsAction(formData);
-      if (!result.ok) return { error: result.error };
-      return { error: "", ok: true };
-    },
-    null
-  );
+  const [state, setState] = useState<{ error: string; ok?: boolean } | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPending(true);
+    setState(null);
+    const formData = new FormData(e.currentTarget);
+    formData.set("membershipId", membershipId);
+    const result = await updateStoreAssignmentsAction(formData);
+    if (!result.ok) setState({ error: result.error });
+    else setState({ error: "", ok: true });
+    setPending(false);
+  }
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-2">
         {stores.map((store) => (
           <label

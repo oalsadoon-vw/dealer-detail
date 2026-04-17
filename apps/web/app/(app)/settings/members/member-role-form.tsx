@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState } from "react";
 import { updateMemberRoleAction } from "@/lib/server/actions/org-admin";
 import { MEMBERSHIP_ROLES } from "@/lib/types/auth";
 
@@ -11,18 +11,23 @@ export function MemberRoleForm({
   membershipId: string;
   currentRole: string;
 }) {
-  const [state, formAction, pending] = useActionState(
-    async (_prev: { error: string } | null, formData: FormData) => {
-      formData.set("membershipId", membershipId);
-      const result = await updateMemberRoleAction(formData);
-      if (!result.ok) return { error: result.error };
-      return null;
-    },
-    null
-  );
+  const [state, setState] = useState<{ error: string } | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPending(true);
+    setState(null);
+    const formData = new FormData(e.currentTarget);
+    formData.set("membershipId", membershipId);
+    const result = await updateMemberRoleAction(formData);
+    if (!result.ok) setState({ error: result.error });
+    else setState(null);
+    setPending(false);
+  }
 
   return (
-    <form action={formAction} className="flex items-center gap-2">
+    <form onSubmit={handleSubmit} className="flex items-center gap-2">
       <select
         name="role"
         defaultValue={currentRole}

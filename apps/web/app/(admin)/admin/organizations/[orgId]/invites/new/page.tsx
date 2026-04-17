@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useActionState } from "react";
+import { useState } from "react";
 import { createInviteForOrgAction } from "@/lib/server/actions/admin";
 import { MEMBERSHIP_ROLES } from "@/lib/types/auth";
 
@@ -37,18 +37,22 @@ export default function CreateInvitePage() {
 }
 
 function InviteForm({ orgId }: { orgId: string }) {
-  const [state, formAction, pending] = useActionState(
-    async (_prev: { error: string } | null, formData: FormData) => {
-      formData.set("orgId", orgId);
-      const result = await createInviteForOrgAction(formData);
-      if (!result.ok) return { error: result.error };
-      return null;
-    },
-    null
-  );
+  const [state, setState] = useState<{ error: string } | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPending(true);
+    setState(null);
+    const formData = new FormData(e.currentTarget);
+    formData.set("orgId", orgId);
+    const result = await createInviteForOrgAction(formData);
+    if (!result.ok) setState({ error: result.error });
+    setPending(false);
+  }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <label className="block space-y-1">
         <span className="text-sm text-zinc-400">Email address</span>
         <input
