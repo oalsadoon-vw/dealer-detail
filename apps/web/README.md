@@ -1,4 +1,4 @@
-## DealerDetail (web)
+## Fixed Ops Reports (web)
 
 Next.js + Postgres + Prisma app for ingesting Tekion Excel exports, storing raw rows + normalized metrics, and rendering advisor dashboards.
 

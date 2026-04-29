@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import type { MembershipRole } from "@/lib/types/auth";
+import { BrandMark, BRAND_NAME } from "@/components/BrandMark";
 
 type NavItem = {
   href: string;
@@ -153,16 +154,21 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
         "transition-[width] duration-200 ease-out"
       )}
     >
-      {/* Header with org context */}
-      <div className="flex h-16 items-center justify-between px-4 border-b border-zinc-900">
-        <div className="flex items-center gap-2 overflow-hidden min-w-0">
-          <div className="shrink-0 h-8 w-8 rounded-lg bg-zinc-900 text-white grid place-items-center font-bold border border-zinc-800">
-            D
+      {/* Header — brand identity */}
+      <div
+        className={cx(
+          "flex h-16 items-center border-b border-zinc-900",
+          collapsed ? "justify-center px-2" : "justify-between gap-2 pl-4 pr-2"
+        )}
+      >
+        <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
+          <div className="shrink-0">
+            <BrandMark size="sm" variant="dark" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <span className="font-semibold text-zinc-100 whitespace-nowrap block text-sm">
-                DealerDetail
+              <span className="font-semibold text-zinc-100 whitespace-nowrap block text-sm tracking-tight">
+                {BRAND_NAME}
               </span>
               {user?.orgName && (
                 <span className="text-[10px] text-zinc-500 truncate block">
@@ -172,26 +178,37 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
             </div>
           )}
         </div>
-        <button
-          type="button"
-          className={cx(
-            "rounded p-1 text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors",
-            "hidden md:block"
-          )}
-          onClick={() => setCollapsed((v) => !v)}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? (
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
+        {!collapsed && (
+          <button
+            type="button"
+            className="hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:text-white hover:bg-zinc-900 transition-colors"
+            onClick={() => setCollapsed(true)}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
             </svg>
-          )}
-        </button>
+          </button>
+        )}
       </div>
+
+      {/* Expand toggle — own row, only when collapsed (md+) */}
+      {collapsed && (
+        <div className="hidden md:flex justify-center border-b border-zinc-900 py-1.5">
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:text-white hover:bg-zinc-900 transition-colors"
+            onClick={() => setCollapsed(false)}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Org switcher (only if multiple orgs, expanded mode) */}
       {!collapsed && hasMultipleOrgs && (
@@ -361,20 +378,20 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
     <>
       {/* Mobile top bar */}
       <div className="md:hidden flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-zinc-900 text-white grid place-items-center font-bold">
-            D
-          </div>
-          <div>
-            <div className="font-semibold text-zinc-900 text-sm">DealerDetail</div>
+        <div className="flex items-center gap-2 min-w-0">
+          <BrandMark size="sm" variant="dark" />
+          <div className="min-w-0">
+            <div className="font-semibold text-zinc-900 text-sm tracking-tight truncate">
+              {BRAND_NAME}
+            </div>
             {user?.orgName && (
-              <div className="text-[10px] text-zinc-500">{user.orgName}</div>
+              <div className="text-[10px] text-zinc-500 truncate">{user.orgName}</div>
             )}
           </div>
         </div>
         <button
           type="button"
-          className="rounded border px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50"
+          className="rounded border px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 shrink-0"
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation"
         >

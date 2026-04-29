@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { BRAND_NAME } from "@/components/BrandMark";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export default async function AdminDashboard() {
       <div>
         <h1 className="text-2xl font-bold">Platform Admin</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Internal management console for DealerDetail.
+          Internal management console for {BRAND_NAME}.
         </p>
       </div>
 

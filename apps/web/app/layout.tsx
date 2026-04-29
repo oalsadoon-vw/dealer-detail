@@ -2,9 +2,9 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "DealerDetail — Dealership Performance Intelligence",
+  title: "Fixed Ops Reports — Service Department Performance Intelligence",
   description:
-    "DealerDetail transforms your Tekion data into actionable advisor performance insights. Built for dealership groups that run on metrics.",
+    "Fixed Ops Reports transforms your Tekion data into actionable advisor performance insights. Built for dealership groups that run on metrics.",
 };
 
 export default function RootLayout({

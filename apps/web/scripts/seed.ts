@@ -130,7 +130,7 @@ async function main() {
     prisma.profile.upsert({
       where: { id: EVE_ID },
       update: {},
-      create: { id: EVE_ID, email: "eve@dealerdetail.com", fullName: "Eve Platform" },
+      create: { id: EVE_ID, email: "eve@fixedopsreports.com", fullName: "Eve Platform" },
     }),
   ]);
   console.log(`  Profiles: ${profiles.length}`);
@@ -222,7 +222,7 @@ async function main() {
   console.log("  bob@acme-auto.com       (Acme store_admin, ABS only)");
   console.log("  carol@prestige.com      (Prestige org_admin)");
   console.log("  dan@prestige.com        (Prestige viewer, PPW+PAD)");
-  console.log("  eve@dealerdetail.com    (Platform admin)");
+  console.log("  eve@fixedopsreports.com (Platform admin)");
   console.log("  newguy@acme-auto.com    (Pending invite → Acme manager)");
 }
 

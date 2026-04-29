@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
+import { BrandLockup, BRAND_NAME } from "@/components/BrandMark";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -63,8 +64,9 @@ export default function LoginForm() {
 
   if (magicSent) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex">
-        <div className="flex flex-1 flex-col items-center justify-center px-6">
+      <div className="relative min-h-screen overflow-hidden bg-zinc-950 flex">
+        <AuthBackground />
+        <div className="relative flex flex-1 flex-col items-center justify-center px-6">
           <div className="w-full max-w-sm space-y-8">
             <div className="text-center space-y-3">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-emerald-800/60 bg-emerald-900/30">
@@ -105,17 +107,12 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex">
+    <div className="relative min-h-screen overflow-hidden bg-zinc-950 flex">
+      <AuthBackground />
+
       {/* Left branding panel — hidden on mobile */}
-      <div className="hidden lg:flex lg:w-[480px] flex-col justify-between border-r border-zinc-800/60 bg-zinc-900/20 p-12">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-lg bg-white text-zinc-950 grid place-items-center font-bold">
-            D
-          </div>
-          <span className="font-semibold text-[15px] tracking-tight text-white">
-            DealerDetail
-          </span>
-        </Link>
+      <div className="relative hidden lg:flex lg:w-[480px] flex-col justify-between border-r border-zinc-800/60 bg-zinc-900/30 p-12 backdrop-blur-sm">
+        <BrandLockup size="sm" variant="light" href="/" textClassName="text-white" />
 
         <div className="space-y-6">
           <blockquote className="text-lg font-medium leading-relaxed text-zinc-300">
@@ -123,27 +120,22 @@ export default function LoginForm() {
             from&nbsp;&mdash; per advisor, per store, every single day.&rdquo;
           </blockquote>
           <div className="text-sm text-zinc-500">
-            Dealership Performance Intelligence
+            Service Department Performance Intelligence
           </div>
         </div>
 
         <div className="text-xs text-zinc-700">
-          &copy; {new Date().getFullYear()} DealerDetail
+          &copy; {new Date().getFullYear()} {BRAND_NAME}
         </div>
       </div>
 
       {/* Right form panel */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6">
+      <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-10">
         <div className="w-full max-w-sm space-y-8">
           <div className="space-y-2">
-            <Link href="/" className="lg:hidden inline-flex items-center gap-2 mb-4">
-              <div className="h-8 w-8 rounded-lg bg-white text-zinc-950 grid place-items-center font-bold text-sm">
-                D
-              </div>
-              <span className="font-semibold text-sm text-white">
-                DealerDetail
-              </span>
-            </Link>
+            <div className="lg:hidden mb-4">
+              <BrandLockup size="sm" variant="light" href="/" textClassName="text-white" />
+            </div>
             <h1 className="text-2xl font-bold text-white">Welcome back</h1>
             <p className="text-sm text-zinc-500">
               Sign in to access your dealership dashboard.
@@ -230,6 +222,31 @@ export default function LoginForm() {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* Subtle background for auth screens — matches landing palette. */
+function AuthBackground() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+    >
+      <div
+        className="absolute inset-0 opacity-[0.25]"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+          maskImage:
+            "radial-gradient(ellipse 80% 60% at 30% 20%, #000 50%, transparent 100%)",
+          WebkitMaskImage:
+            "radial-gradient(ellipse 80% 60% at 30% 20%, #000 50%, transparent 100%)",
+        }}
+      />
+      <div className="absolute -top-40 left-[15%] h-[520px] w-[520px] rounded-full bg-[radial-gradient(closest-side,rgba(99,102,241,0.18),transparent)] blur-3xl" />
+      <div className="absolute bottom-[-20%] right-[-10%] h-[480px] w-[480px] rounded-full bg-[radial-gradient(closest-side,rgba(16,185,129,0.10),transparent)] blur-3xl" />
     </div>
   );
 }
