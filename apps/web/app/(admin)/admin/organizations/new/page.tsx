@@ -62,6 +62,44 @@ function CreateOrgForm() {
         </span>
       </label>
 
+      <fieldset className="space-y-3 rounded-md border border-zinc-800 bg-zinc-950/40 p-4">
+        <legend className="px-1 text-xs uppercase tracking-wide text-zinc-500">
+          Email source <span className="normal-case text-zinc-600">(optional)</span>
+        </legend>
+        <p className="text-xs text-zinc-500">
+          The DMS email address that delivers this org&apos;s daily reports.
+          Typical setup is one org-wide source (e.g.{" "}
+          <span className="font-mono text-zinc-400">reportbuilder@tekion.com</span>)
+          that covers every store in the org. Leave blank to add later.
+        </p>
+
+        <label className="block space-y-1">
+          <span className="text-sm text-zinc-400">Sender email</span>
+          <input
+            name="senderEmail"
+            type="email"
+            className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            placeholder="reportbuilder@tekion.com"
+          />
+        </label>
+
+        <label className="block space-y-1">
+          <span className="text-sm text-zinc-400">
+            Subject pattern{" "}
+            <span className="text-zinc-600">(optional)</span>
+          </span>
+          <input
+            name="subjectPattern"
+            className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+            placeholder="e.g., DAILY Report"
+          />
+          <span className="text-xs text-zinc-600">
+            Gmail search filter applied alongside the sender. Leave blank to
+            accept any subject.
+          </span>
+        </label>
+      </fieldset>
+
       {state?.error && (
         <div className="rounded-md bg-red-900/40 border border-red-800 px-3 py-2 text-sm text-red-300">
           {state.error}

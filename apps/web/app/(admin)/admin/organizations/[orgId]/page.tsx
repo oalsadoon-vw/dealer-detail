@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { MoveStoreControl } from "./move-store-control";
+import { DeleteStoreButton } from "./delete-store-button";
+import { DeleteOrganizationButton } from "./delete-organization-button";
+import { EmailSourcesPanel } from "./email-sources-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +32,7 @@ export default async function OrgDetailPage({
   });
   if (!org) notFound();
 
-  const [stores, members, invites] = await Promise.all([
+  const [stores, members, invites, otherOrgs, emailSourcesRaw] = await Promise.all([
     prisma.store.findMany({
       where: { organizationId: org.id },
       orderBy: { name: "asc" },
@@ -54,14 +58,43 @@ export default async function OrgDetailPage({
         invitedBy: { select: { email: true } },
       },
     }),
+    prisma.organization.findMany({
+      where: { id: { not: org.id } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.emailSource.findMany({
+      where: { organizationId: org.id },
+      orderBy: [{ storeId: "asc" }, { senderEmail: "asc" }],
+      select: {
+        id: true,
+        senderEmail: true,
+        subjectPattern: true,
+        isActive: true,
+        lastProcessedAt: true,
+        storeId: true,
+        store: { select: { name: true } },
+      },
+    }),
   ]);
 
+  const emailSources = emailSourcesRaw.map((s) => ({
+    id: s.id,
+    senderEmail: s.senderEmail,
+    subjectPattern: s.subjectPattern,
+    isActive: s.isActive,
+    lastProcessedAt: s.lastProcessedAt,
+    storeId: s.storeId,
+    storeName: s.store?.name ?? null,
+  }));
+
   const hasOrgAdmin = members.some((m) => m.role === "org_admin");
+  const hasEmailSource = emailSources.some((s) => s.isActive);
   const pendingInvites = invites.filter((i) => !i.acceptedAt && i.expiresAt > new Date());
   const acceptedInvites = invites.filter((i) => i.acceptedAt);
   const expiredInvites = invites.filter((i) => !i.acceptedAt && i.expiresAt <= new Date());
 
-  const onboardingComplete = hasOrgAdmin && stores.length > 0;
+  const onboardingComplete = hasOrgAdmin && stores.length > 0 && hasEmailSource;
 
   return (
     <div className="space-y-8">
@@ -82,6 +115,7 @@ export default async function OrgDetailPage({
           )}
           {!hasOrgAdmin && <Badge variant="red">No Org Admin</Badge>}
           {stores.length === 0 && <Badge variant="red">No Stores</Badge>}
+          {!hasEmailSource && <Badge variant="red">No Email Source</Badge>}
         </div>
       </div>
 
@@ -112,6 +146,17 @@ export default async function OrgDetailPage({
                 </Link>
               )}
             </li>
+            <li className="flex items-center gap-2">
+              <span className={hasEmailSource ? "text-emerald-400" : "text-zinc-600"}>{hasEmailSource ? "✓" : "○"}</span>
+              <span className={hasEmailSource ? "text-zinc-300" : "text-zinc-400"}>
+                Configure at least one email source
+              </span>
+              {!hasEmailSource && (
+                <span className="text-xs text-yellow-400 ml-auto">
+                  Use the &quot;Email Sources&quot; section below
+                </span>
+              )}
+            </li>
           </ul>
         </div>
       )}
@@ -136,6 +181,7 @@ export default async function OrgDetailPage({
                   <th className="text-left p-3 text-zinc-400 font-medium">Abbreviation</th>
                   <th className="text-left p-3 text-zinc-400 font-medium">Timezone</th>
                   <th className="text-left p-3 text-zinc-400 font-medium">Created</th>
+                  <th className="text-right p-3 text-zinc-400 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,6 +191,16 @@ export default async function OrgDetailPage({
                     <td className="p-3 font-mono text-zinc-500">{s.abbreviation ?? "—"}</td>
                     <td className="p-3 text-zinc-500">{s.timezone ?? "—"}</td>
                     <td className="p-3 text-zinc-500">{s.createdAt.toLocaleDateString()}</td>
+                    <td className="p-3">
+                      <div className="flex items-center justify-end gap-3">
+                        <MoveStoreControl
+                          storeId={s.id}
+                          storeName={s.name}
+                          otherOrgs={otherOrgs}
+                        />
+                        <DeleteStoreButton storeId={s.id} storeName={s.name} />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -154,6 +210,9 @@ export default async function OrgDetailPage({
           <p className="text-sm text-zinc-600">No stores yet.</p>
         )}
       </section>
+
+      {/* Email sources */}
+      <EmailSourcesPanel orgId={org.id} sources={emailSources} />
 
       {/* Members section */}
       <section className="space-y-3">
@@ -238,6 +297,23 @@ export default async function OrgDetailPage({
         ) : (
           <p className="text-sm text-zinc-600">No invites sent yet.</p>
         )}
+      </section>
+
+      {/* Danger zone */}
+      <section className="space-y-3 rounded-lg border border-red-900/40 bg-red-950/10 p-5">
+        <div>
+          <h2 className="text-sm font-semibold text-red-300">Danger zone</h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            Deleting an organization removes its memberships and invites. Stores
+            must be moved or deleted first.
+          </p>
+        </div>
+        <DeleteOrganizationButton
+          orgId={org.id}
+          orgName={org.name}
+          orgSlug={org.slug}
+          storeCount={stores.length}
+        />
       </section>
     </div>
   );

@@ -19,12 +19,14 @@ type MessageResult = {
   attachmentsFound: number;
   filesIngested: number;
   storesMatched: string[];
+  unmatchedAttachments: string[];
   ingestResults: IngestResult[];
   error?: string;
 };
 
 type SourceResult = {
   senderEmail: string;
+  organizationIds: string[];
   storeIds: string[];
   messagesFound: number;
   messageResults: MessageResult[];
@@ -69,16 +71,6 @@ export async function GET(req: Request) {
     });
   }
 
-  const allStores = await prisma.store.findMany({
-    where: { abbreviation: { not: null } },
-    select: { id: true, abbreviation: true }
-  });
-  const storeByAbbreviation = new Map(
-    allStores
-      .filter((s) => s.abbreviation)
-      .map((s) => [s.abbreviation!.toUpperCase(), s.id])
-  );
-
   const ingestedLabelId = await listOrCreateLabel("ingested");
 
   type SourceWithStore = (typeof sources)[number];
@@ -90,9 +82,40 @@ export async function GET(req: Request) {
     senderGroups.set(key, group);
   }
 
+  // For each sender, build an abbreviation map scoped to the organizations
+  // that subscribe to it. This prevents two customer orgs that share a DMS
+  // (e.g. both on Tekion's reportbuilder@tekion.com) from routing each
+  // other's attachments via globally-overlapping abbreviations.
+  const orgIdsBySender = new Map<string, string[]>();
+  for (const [senderEmail, groupSources] of senderGroups) {
+    const orgIds = Array.from(
+      new Set(groupSources.map((s) => s.organizationId))
+    );
+    orgIdsBySender.set(senderEmail, orgIds);
+  }
+
+  const allRelevantOrgIds = Array.from(
+    new Set(Array.from(orgIdsBySender.values()).flat())
+  );
+  const scopedStores = await prisma.store.findMany({
+    where: {
+      organizationId: { in: allRelevantOrgIds },
+      abbreviation: { not: null },
+    },
+    select: { id: true, abbreviation: true, organizationId: true },
+  });
+  const storesByOrg = new Map<string, { abbr: string; storeId: string }[]>();
+  for (const s of scopedStores) {
+    if (!s.abbreviation) continue;
+    const list = storesByOrg.get(s.organizationId) ?? [];
+    list.push({ abbr: s.abbreviation.toUpperCase(), storeId: s.id });
+    storesByOrg.set(s.organizationId, list);
+  }
+
   const sourceResults: SourceResult[] = [];
 
   for (const [senderEmail, groupSources] of senderGroups) {
+    const senderOrgIds = orgIdsBySender.get(senderEmail) ?? [];
     const subjectPatterns = groupSources
       .map((s) => s.subjectPattern)
       .filter(Boolean);
@@ -107,7 +130,8 @@ export async function GET(req: Request) {
       console.error(`Failed to fetch emails for sender ${senderEmail}:`, err);
       sourceResults.push({
         senderEmail,
-        storeIds: groupSources.map((s) => s.storeId),
+        organizationIds: senderOrgIds,
+        storeIds: groupSources.map((s) => s.storeId).filter((x): x is string => !!x),
         messagesFound: 0,
         messageResults: [{
           messageId: "N/A",
@@ -116,12 +140,24 @@ export async function GET(req: Request) {
           attachmentsFound: 0,
           filesIngested: 0,
           storesMatched: [],
+          unmatchedAttachments: [],
           ingestResults: [],
           error: `Failed to fetch emails: ${String(err)}`
         }]
       });
       continue;
     }
+
+    // Build the abbreviation lookup tables this sender is allowed to route
+    // into. Each entry is scoped to one of the orgs that subscribes to this
+    // sender. We try them in turn per attachment.
+    const senderAbbrTables = senderOrgIds.map((orgId) => ({
+      orgId,
+      stores: storesByOrg.get(orgId) ?? [],
+    }));
+
+    // Per-store-override fallback (for the rare per-store EmailSource).
+    const storeOverrideSources = groupSources.filter((s) => s.storeId);
 
     const messageResults: MessageResult[] = [];
 
@@ -138,6 +174,7 @@ export async function GET(req: Request) {
             attachmentsFound: 0,
             filesIngested: 0,
             storesMatched: [],
+            unmatchedAttachments: [],
             ingestResults: []
           });
           continue;
@@ -146,28 +183,43 @@ export async function GET(req: Request) {
         const businessDate = parseEmailDateToBusinessDate(emailDate);
 
         const filesByStoreId = new Map<string, EmailAttachment[]>();
+        const unmatchedAttachments: string[] = [];
 
         for (const att of attachments) {
           const upperName = att.filename.toUpperCase();
           let resolvedStoreId: string | undefined;
 
-          for (const [abbr, sid] of storeByAbbreviation) {
-            if (upperName.includes(abbr)) {
-              resolvedStoreId = sid;
-              break;
+          // Org-scoped abbreviation matching — try each subscribed org's
+          // store list. First abbreviation match (longest abbreviations
+          // should be added first; we don't enforce ordering yet).
+          for (const { stores } of senderAbbrTables) {
+            for (const { abbr, storeId } of stores) {
+              if (upperName.includes(abbr)) {
+                resolvedStoreId = storeId;
+                break;
+              }
             }
+            if (resolvedStoreId) break;
+          }
+
+          // Fallback: a single store-scoped EmailSource for this sender.
+          // Only safe when there's exactly one such override AND no org-wide
+          // sources for this sender (otherwise we'd be guessing across orgs).
+          if (
+            !resolvedStoreId &&
+            storeOverrideSources.length === 1 &&
+            groupSources.length === 1
+          ) {
+            resolvedStoreId = storeOverrideSources[0].storeId ?? undefined;
           }
 
           if (!resolvedStoreId) {
-            if (groupSources.length === 1) {
-              resolvedStoreId = groupSources[0].storeId;
-            } else {
-              console.warn(
-                `Could not resolve store for attachment '${att.filename}' in message ${msg.id}. ` +
-                `No abbreviation matched and multiple sources exist for sender.`
-              );
-              continue;
-            }
+            unmatchedAttachments.push(att.filename);
+            console.warn(
+              `[gmail-ingest] Could not resolve store for attachment '${att.filename}' in message ${msg.id}. ` +
+                `Subscribed orgs: ${senderOrgIds.join(", ")}.`
+            );
+            continue;
           }
 
           const existing = filesByStoreId.get(resolvedStoreId) ?? [];
@@ -190,16 +242,26 @@ export async function GET(req: Request) {
 
         await markEmailAsIngested(msg.id, ingestedLabelId);
 
-        const sourceIds = new Set(groupSources.map((s) => s.storeId));
-        const matchedSourceIds = storesMatched.filter((id) => sourceIds.has(id));
-        if (matchedSourceIds.length > 0) {
-          await prisma.emailSource.updateMany({
-            where: {
-              storeId: { in: matchedSourceIds },
-              senderEmail: { equals: senderEmail, mode: "insensitive" }
-            },
-            data: { lastProcessedAt: new Date() }
+        // Stamp every EmailSource matching this sender across all subscribed
+        // orgs that actually had a matched store. This keeps the "last
+        // processed" indicator accurate per source row.
+        if (storesMatched.length > 0) {
+          const storesMatchedOrgIds = await prisma.store.findMany({
+            where: { id: { in: storesMatched } },
+            select: { organizationId: true },
           });
+          const matchedOrgIds = Array.from(
+            new Set(storesMatchedOrgIds.map((s) => s.organizationId))
+          );
+          if (matchedOrgIds.length > 0) {
+            await prisma.emailSource.updateMany({
+              where: {
+                organizationId: { in: matchedOrgIds },
+                senderEmail: { equals: senderEmail, mode: "insensitive" }
+              },
+              data: { lastProcessedAt: new Date() }
+            });
+          }
         }
 
         messageResults.push({
@@ -209,6 +271,7 @@ export async function GET(req: Request) {
           attachmentsFound: attachments.length,
           filesIngested: ingestResults.reduce((sum, r) => sum + r.filesIngested.length, 0),
           storesMatched,
+          unmatchedAttachments,
           ingestResults
         });
       } catch (err) {
@@ -220,6 +283,7 @@ export async function GET(req: Request) {
           attachmentsFound: 0,
           filesIngested: 0,
           storesMatched: [],
+          unmatchedAttachments: [],
           ingestResults: [],
           error: String(err)
         });
@@ -228,7 +292,8 @@ export async function GET(req: Request) {
 
     sourceResults.push({
       senderEmail,
-      storeIds: groupSources.map((s) => s.storeId),
+      organizationIds: senderOrgIds,
+      storeIds: groupSources.map((s) => s.storeId).filter((x): x is string => !!x),
       messagesFound: messages.length,
       messageResults
     });

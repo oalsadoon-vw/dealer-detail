@@ -216,6 +216,21 @@ async function main() {
   });
   console.log("  Pending invites: 2\n");
 
+  // -- Sample org-wide email source (Acme uses Tekion) --
+  const ACME_SOURCE_ID = "50000000-0000-0000-0000-000000000001";
+  await prisma.emailSource.upsert({
+    where: { id: ACME_SOURCE_ID },
+    update: {},
+    create: {
+      id: ACME_SOURCE_ID,
+      organizationId: ACME_ORG_ID,
+      senderEmail: "reportbuilder@tekion.com",
+      subjectPattern: null,
+      isActive: true,
+    },
+  });
+  console.log("  Email sources: Acme → reportbuilder@tekion.com (org-wide)\n");
+
   console.log("Seed complete.");
   console.log("\nTo test, create Supabase Auth users with these emails:");
   console.log("  alice@acme-auto.com     (Acme org_admin)");

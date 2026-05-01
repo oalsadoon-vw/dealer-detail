@@ -23,9 +23,10 @@ model Organization {
   logoUrl  String?
   settings Json?
 
-  stores      Store[]
-  memberships Membership[]
-  invites     Invite[]
+  stores       Store[]
+  memberships  Membership[]
+  invites      Invite[]
+  emailSources EmailSource[]
 }
 
 model Profile {
@@ -282,14 +283,22 @@ model EmailSource {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
-  storeId         String
-  store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Optional per-store override. NULL = org-wide source (the typical case:
+  // a single DMS sender like reportbuilder@tekion.com routes to all stores
+  // in the org via filename abbreviation matching).
+  storeId String?
+  store   Store?  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   senderEmail     String
   subjectPattern  String?
-  isActive        Boolean  @default(true)
+  isActive        Boolean   @default(true)
   lastProcessedAt DateTime?
 
+  @@unique([organizationId, senderEmail])
+  @@index([organizationId])
   @@index([senderEmail])
   @@index([storeId])
 }
