@@ -23,11 +23,14 @@ export function DeleteOrganizationButton({
     if (disabled) return;
 
     const typed = window.prompt(
-      `Permanently delete the "${orgName}" organization?\n\nAll memberships and invites tied to this org will be removed. (This org has 0 stores, so no store data is affected.) This cannot be undone.\n\nType the organization slug to confirm:`
+      `Permanently delete the "${orgName}" organization?\n\nAll memberships and invites tied to this org will be removed. (This org has 0 stores, so no store data is affected.) This cannot be undone.\n\nTo confirm, type this slug exactly:\n\n    ${orgSlug}`
     );
     if (typed === null) return;
-    if (typed !== orgSlug) {
-      setError("Confirmation did not match the organization slug. Nothing was deleted.");
+    const normalized = typed.trim().toLowerCase();
+    if (normalized !== orgSlug) {
+      setError(
+        `Confirmation did not match. Expected "${orgSlug}", got "${typed}". Nothing was deleted.`
+      );
       return;
     }
 
@@ -35,9 +38,13 @@ export function DeleteOrganizationButton({
     setError(null);
     const formData = new FormData();
     formData.set("orgId", orgId);
-    formData.set("confirm", typed);
+    formData.set("confirm", normalized);
+    // On success, the action calls `redirect()` which throws NEXT_REDIRECT
+    // server-side; the client-side promise then resolves to `undefined` and
+    // the page navigates away. Only treat a defined `{ ok: false }` as a
+    // real failure.
     const result = await deleteOrganizationAction(formData);
-    if (!result.ok) {
+    if (result && !result.ok) {
       setError(result.error);
       setPending(false);
     }

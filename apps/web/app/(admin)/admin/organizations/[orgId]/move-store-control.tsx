@@ -39,7 +39,7 @@ export function MoveStoreControl({
     formData.set("storeId", storeId);
     formData.set("targetOrgId", targetOrgId);
     const result = await moveStoreToOrgAction(formData);
-    if (!result.ok) {
+    if (result && !result.ok) {
       setError(result.error);
       setPending(false);
     }

@@ -29,7 +29,7 @@ export function DeleteStoreButton({
     formData.set("storeId", storeId);
     formData.set("confirm", typed);
     const result = await deleteStoreAction(formData);
-    if (!result.ok) {
+    if (result && !result.ok) {
       setError(result.error);
       setPending(false);
     }

@@ -71,6 +71,15 @@ function pct(n: number, d: number) {
   return `${((n / d) * 100).toFixed(2)}%`;
 }
 
+// Commodity-per-RO is an "attach rate" that legitimately exceeds 1.0
+// (one RO can sell multiple tires, filters, etc). Rendering it as a
+// percentage produces values like "2000%" which read as broken. Show
+// it as a 2-decimal multiplier instead.
+function ratio(n: number, d: number) {
+  if (d === 0) return "—";
+  return (n / d).toFixed(2);
+}
+
 function int0(x: number) {
   return Math.round(x || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
@@ -184,9 +193,13 @@ export function AdvisorDrawer({
         onClick={handleClose}
       />
 
-      {/* Drawer panel */}
+      {/* Drawer panel.
+          `max-w-4xl` (1024px) instead of 2xl: the body holds 3 KPI rows,
+          4 line charts, 2 pie charts, and 2 detail tables. At 2xl the
+          pie-card cells were ~300px wide which collapsed the legend layout
+          and made the whole popup feel cramped. */}
       <div
-        className={`relative w-full max-w-2xl bg-white shadow-2xl transition-transform duration-300 ease-out flex flex-col ${
+        className={`relative w-full max-w-4xl bg-white shadow-2xl transition-transform duration-300 ease-out flex flex-col ${
           visible ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -239,7 +252,7 @@ export function AdvisorDrawer({
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Stat label="Comm Qty" value={int0(totalCommQty)} />
-                <Stat label="Comm %" value={pct(totalCommQty, m.openRos)} />
+                <Stat label="Comm / RO" value={ratio(totalCommQty, m.openRos)} />
                 <Stat label="Rec Sold" value={money(m.recSoldAmount)} />
                 <Stat label="Rec Opp" value={money(m.recAmount)} />
               </div>

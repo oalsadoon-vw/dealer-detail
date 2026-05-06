@@ -47,8 +47,10 @@ function InviteForm({ orgId }: { orgId: string }) {
     const formData = new FormData(e.currentTarget);
     formData.set("orgId", orgId);
     const result = await createInviteForOrgAction(formData);
-    if (!result.ok) setState({ error: result.error });
-    setPending(false);
+    if (result && !result.ok) {
+      setState({ error: result.error });
+      setPending(false);
+    }
   }
 
   return (

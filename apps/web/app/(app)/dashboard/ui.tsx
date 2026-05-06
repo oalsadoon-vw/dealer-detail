@@ -79,6 +79,13 @@ function int0(x: number) {
 function pct(x: number) {
   return `${num2((x || 0) * 100)}%`;
 }
+// "Commodity per RO" is an attach rate: one RO can include many commodity
+// items, so the ratio routinely exceeds 1.0. Display as a 2-decimal
+// multiplier instead of a percentage to avoid values like "1725%" reading
+// as broken. (See AdvisorDrawer for the same convention.)
+function ratio(x: number) {
+  return num2(x || 0);
+}
 function money(x: number) {
   return (x || 0).toLocaleString(undefined, {
     style: "currency",
@@ -527,7 +534,7 @@ export default function DashboardClient({
               <StatCard label="Advisors Active" value={fullPictureRows.length.toString()} />
 
               <StatCard label="Menu Sales %" value={pct(totals.menuSalesPct)} subtext={`${fmtCount(totals.menuCountTotal)} Sold`} />
-              <StatCard label="Commodity %" value={pct(totals.commodityPct)} subtext={`${fmtCount(totals.commodityQtyTotal)} Qty`} />
+              <StatCard label="Comm / RO" value={ratio(totals.commodityPct)} subtext={`${fmtCount(totals.commodityQtyTotal)} Qty`} />
               <StatCard label="Rec Closing %" value={pct(totals.recClosingPct)} subtext={`${fmtMoney(totals.recSoldAmountTotal)} Sold`} />
             </div>
 
@@ -554,7 +561,7 @@ export default function DashboardClient({
                       <Th>Open ROs</Th>
                       <Th>Menu %</Th>
                       <Th>Ala %</Th>
-                      <Th>Comm %</Th>
+                      <Th>Comm / RO</Th>
                       <Th>Rec Sold / Opp</Th>
                       <Th>Rec Close %</Th>
                       <Th className="text-right pr-6">Daily Gross</Th>
@@ -567,7 +574,7 @@ export default function DashboardClient({
                         <Td>{fmtCount(a.metrics.openRos)}</Td>
                         <Td>{pct(fp.menuSalesPct)} <span className="text-zinc-400 text-xs ml-1">({fmtCount(a.metrics.menuCount)})</span></Td>
                         <Td>{pct(fp.alaPct)} <span className="text-zinc-400 text-xs ml-1">({fmtCount(a.metrics.alaCount)})</span></Td>
-                        <Td>{pct(fp.commodityPct)} <span className="text-zinc-400 text-xs ml-1">({fmtCount(fp.commodityQtyTotal)})</span></Td>
+                        <Td>{ratio(fp.commodityPct)} <span className="text-zinc-400 text-xs ml-1">({fmtCount(fp.commodityQtyTotal)})</span></Td>
                         <Td className="text-zinc-600">{fmtMoney(a.metrics.recSoldAmount)} <span className="text-zinc-400">/ {fmtMoney(a.metrics.recAmount)}</span></Td>
                         <Td>
                           <span className={cx(

@@ -91,13 +91,18 @@ export function PieChart(props: {
         <div className="w-full flex-1 min-w-0 space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
           {slices.map((s) => (
             <div key={s.label} className="flex items-center justify-between gap-3 text-sm group min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
+              {/* `flex-1 min-w-0` ensures the label group claims available
+                  space and `truncate` actually has room to apply when the
+                  legend column is narrow. Without `flex-1`, `justify-between`
+                  + the value's `shrink-0` would collapse the label to 0 width
+                  and only the colored dot would render. */}
+              <div className="flex flex-1 items-center gap-2 min-w-0">
                 <span className="inline-block h-3 w-3 rounded-full shadow-sm shrink-0" style={{ background: s.color }} />
                 <span className="text-zinc-600 font-medium group-hover:text-zinc-900 transition-colors truncate" title={s.label}>
                   {s.label}
                 </span>
               </div>
-              <div className="font-mono text-zinc-700 font-semibold shrink-0 truncate">{fmt(s.value)}</div>
+              <div className="font-mono text-zinc-700 font-semibold tabular-nums shrink-0">{fmt(s.value)}</div>
             </div>
           ))}
           {cleaned.length === 0 && <div className="text-sm text-zinc-400 italic">No data available</div>}

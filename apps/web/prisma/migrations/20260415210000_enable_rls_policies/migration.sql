@@ -19,9 +19,10 @@
 -- Helper functions
 -- ============================================================================
 
-CREATE OR REPLACE FUNCTION auth.user_id() RETURNS TEXT AS $$
-  SELECT COALESCE(auth.uid()::text, '');
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+-- NOTE: We intentionally do NOT create helpers in the `auth` schema. On
+-- Supabase, the pooled `postgres` role used by Prisma cannot create objects
+-- inside `auth` (permission denied), and the policies below call
+-- `auth.uid()::text` directly, so no wrapper is needed.
 
 -- Returns org IDs the authenticated user is a member of
 CREATE OR REPLACE FUNCTION public.user_org_ids() RETURNS SETOF TEXT AS $$

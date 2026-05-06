@@ -32,8 +32,12 @@ function CreateOrgForm() {
     setState(null);
     const formData = new FormData(e.currentTarget);
     const result = await createOrganizationAction(formData);
-    if (!result.ok) setState({ error: result.error });
-    setPending(false);
+    // On success the action `redirect()`s; the awaited value is `undefined`
+    // and the page navigates. Only show an error for an explicit failure.
+    if (result && !result.ok) {
+      setState({ error: result.error });
+      setPending(false);
+    }
   }
 
   return (

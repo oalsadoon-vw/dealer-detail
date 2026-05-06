@@ -320,7 +320,7 @@ export async function deleteOrganizationAction(
   const admin = await resolveAdminContext();
 
   const orgId = (formData.get("orgId") as string)?.trim();
-  const confirm = (formData.get("confirm") as string)?.trim();
+  const confirm = (formData.get("confirm") as string)?.trim().toLowerCase();
 
   if (!orgId) return { ok: false, error: "Organization id is required" };
 
