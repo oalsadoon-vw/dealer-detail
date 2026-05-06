@@ -3,6 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/auth/api-guard";
 import { requireManagerOrHigher, requireRunAccess } from "@/lib/server/authz";
+import { invalidateRunsCache } from "@/lib/server/services/runs";
+import { invalidateDashboardCache } from "@/lib/server/services/dashboard";
 
 export const runtime = "nodejs";
 
@@ -37,6 +39,9 @@ export const DELETE = withAuth<RouteCtx>(async (_req, ctx, tc) => {
     "@/lib/parsing/reaggregation"
   );
   await reaggregateStoreDate(run.storeId, run.businessDate);
+
+  invalidateRunsCache();
+  invalidateDashboardCache(run.storeId);
 
   return NextResponse.json({ success: true });
 });

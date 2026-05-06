@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import type {
@@ -21,36 +22,36 @@ const ORG_COOKIE = "dd_org_id";
  * Returns null only if the user has zero memberships (should not happen
  * inside the protected app shell — layout.tsx gates on this).
  */
-export async function getCurrentOrgContext(
-  sessionUser: SessionUser
-): Promise<OrgContext | null> {
-  if (sessionUser.memberships.length === 0) return null;
+export const getCurrentOrgContext = cache(
+  async (sessionUser: SessionUser): Promise<OrgContext | null> => {
+    if (sessionUser.memberships.length === 0) return null;
 
-  const cookieStore = await cookies();
-  const preferredOrgId = cookieStore.get(ORG_COOKIE)?.value;
+    const cookieStore = await cookies();
+    const preferredOrgId = cookieStore.get(ORG_COOKIE)?.value;
 
-  let membership = preferredOrgId
-    ? sessionUser.memberships.find((m) => m.organizationId === preferredOrgId)
-    : undefined;
+    let membership = preferredOrgId
+      ? sessionUser.memberships.find((m) => m.organizationId === preferredOrgId)
+      : undefined;
 
-  if (!membership) {
-    membership = sessionUser.memberships[0];
+    if (!membership) {
+      membership = sessionUser.memberships[0];
+    }
+
+    const accessibleStoreIds = await resolveAccessibleStoreIds(
+      sessionUser,
+      membership
+    );
+
+    return {
+      organizationId: membership.organizationId,
+      organizationName: membership.organization.name,
+      organizationSlug: membership.organization.slug,
+      role: membership.role,
+      membershipId: membership.id,
+      accessibleStoreIds,
+    };
   }
-
-  const accessibleStoreIds = await resolveAccessibleStoreIds(
-    sessionUser,
-    membership
-  );
-
-  return {
-    organizationId: membership.organizationId,
-    organizationName: membership.organization.name,
-    organizationSlug: membership.organization.slug,
-    role: membership.role,
-    membershipId: membership.id,
-    accessibleStoreIds,
-  };
-}
+);
 
 /**
  * Returns the list of store IDs the user can access within an org.

@@ -97,15 +97,15 @@ export default async function OrgDetailPage({
   const onboardingComplete = hasOrgAdmin && stores.length > 0 && hasEmailSource;
 
   return (
-    <div className="space-y-8">
+    <div className="fade-in-up space-y-8 min-w-0">
       {/* Header */}
-      <div>
+      <div className="min-w-0">
         <Link href="/admin/organizations" className="text-xs text-zinc-500 hover:text-zinc-300">
           &larr; Organizations
         </Link>
-        <div className="flex items-center gap-3 mt-2">
-          <h1 className="text-2xl font-bold">{org.name}</h1>
-          <span className="font-mono text-sm text-zinc-500">{org.slug}</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 min-w-0">
+          <h1 className="text-2xl font-bold truncate">{org.name}</h1>
+          <span className="font-mono text-sm text-zinc-500 truncate">{org.slug}</span>
         </div>
         <div className="mt-2 flex items-center gap-2">
           {onboardingComplete ? (
@@ -173,8 +173,8 @@ export default async function OrgDetailPage({
           </Link>
         </div>
         {stores.length > 0 ? (
-          <div className="rounded-lg border border-zinc-800 overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="rounded-lg border border-zinc-800 overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
               <thead className="border-b border-zinc-800 bg-zinc-900/50">
                 <tr>
                   <th className="text-left p-3 text-zinc-400 font-medium">Name</th>
@@ -218,8 +218,8 @@ export default async function OrgDetailPage({
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Members ({members.length})</h2>
         {members.length > 0 ? (
-          <div className="rounded-lg border border-zinc-800 overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="rounded-lg border border-zinc-800 overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="border-b border-zinc-800 bg-zinc-900/50">
                 <tr>
                   <th className="text-left p-3 text-zinc-400 font-medium">User</th>
@@ -259,8 +259,8 @@ export default async function OrgDetailPage({
           </Link>
         </div>
         {invites.length > 0 ? (
-          <div className="rounded-lg border border-zinc-800 overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="rounded-lg border border-zinc-800 overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
               <thead className="border-b border-zinc-800 bg-zinc-900/50">
                 <tr>
                   <th className="text-left p-3 text-zinc-400 font-medium">Email</th>

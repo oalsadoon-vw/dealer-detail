@@ -3,6 +3,8 @@ import { z } from "zod";
 import { ingestFiles } from "@/lib/ingest";
 import { withAuth } from "@/lib/auth/api-guard";
 import { requireManagerOrHigher, requireStoreAccess } from "@/lib/server/authz";
+import { invalidateRunsCache } from "@/lib/server/services/runs";
+import { invalidateDashboardCache } from "@/lib/server/services/dashboard";
 
 export const runtime = "nodejs";
 
@@ -47,6 +49,9 @@ export const POST = withAuth(async (req, _ctx, tc) => {
     businessDate: parsedInput.data.businessDate,
     files: fileBuffers,
   });
+
+  invalidateRunsCache();
+  invalidateDashboardCache(parsedInput.data.storeId);
 
   return NextResponse.json(result);
 });

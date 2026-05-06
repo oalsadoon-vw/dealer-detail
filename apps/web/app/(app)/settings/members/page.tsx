@@ -34,8 +34,8 @@ export default async function MembersPage() {
         </Link>
       </div>
 
-      <div className="rounded-lg border bg-white overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-lg border bg-white overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="border-b bg-zinc-50 text-left">
             <tr>
               <th className="p-3 font-medium text-zinc-500">User</th>

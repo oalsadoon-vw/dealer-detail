@@ -19,35 +19,35 @@ export default async function AdminLayout({
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <header className="border-b border-zinc-800">
-        <div className="mx-auto max-w-6xl flex items-center justify-between px-6 h-14">
-          <div className="flex items-center gap-4">
-            <Link href="/admin" className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded bg-red-600 text-white grid place-items-center text-xs font-bold">
+        <div className="mx-auto max-w-6xl flex flex-wrap items-center justify-between gap-y-2 px-4 sm:px-6 py-2 sm:h-14 min-w-0">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <Link href="/admin" className="flex items-center gap-2 min-w-0">
+              <div className="h-7 w-7 shrink-0 rounded bg-red-600 text-white grid place-items-center text-xs font-bold">
                 SA
               </div>
-              <span className="font-semibold text-sm">Platform Admin</span>
+              <span className="font-semibold text-sm truncate">Platform Admin</span>
             </Link>
-            <nav className="hidden sm:flex items-center gap-1 ml-4">
+            <nav className="flex items-center gap-1 sm:ml-4">
               <Link
                 href="/admin/organizations"
-                className="rounded px-3 py-1.5 text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                className="rounded px-3 py-1.5 text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors whitespace-nowrap"
               >
                 Organizations
               </Link>
             </nav>
           </div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="text-zinc-500">{user.email}</span>
+          <div className="flex items-center gap-3 text-sm min-w-0">
+            <span className="hidden sm:inline text-zinc-500 truncate max-w-[200px]" title={user.email}>{user.email}</span>
             <Link
               href="/dashboard"
-              className="rounded border border-zinc-700 px-3 py-1 text-xs text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors"
+              className="rounded border border-zinc-700 px-3 py-1 text-xs text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors whitespace-nowrap"
             >
               Back to app
             </Link>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8 min-w-0">{children}</main>
     </div>
   );
 }

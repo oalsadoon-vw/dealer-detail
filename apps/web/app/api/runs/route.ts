@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/db";
 import { withAuth } from "@/lib/auth/api-guard";
-import { requireStoreAccess } from "@/lib/server/authz";
+import { listRunsForStore } from "@/lib/server/services/runs";
 
 export const runtime = "nodejs";
 
@@ -18,13 +17,6 @@ export const GET = withAuth(async (req, _ctx, tc) => {
     );
   }
 
-  requireStoreAccess(tc, parsed.data);
-
-  const runs = await prisma.ingestionRun.findMany({
-    where: { storeId: parsed.data },
-    orderBy: [{ businessDate: "desc" }, { createdAt: "desc" }],
-    include: { files: true },
-  });
-
+  const runs = await listRunsForStore(tc, parsed.data);
   return NextResponse.json(runs);
 });

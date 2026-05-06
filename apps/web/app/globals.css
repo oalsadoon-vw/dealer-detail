@@ -12,4 +12,71 @@
   }
 }
 
+@layer utilities {
+  /* Soft fade + slight upward translate for content on mount or tab change.
+     Used on dashboard tab content, settings pages, and admin org detail. */
+  .fade-in {
+    animation: fade-in 180ms ease-out both;
+  }
+  .fade-in-up {
+    animation: fade-in-up 220ms ease-out both;
+  }
 
+  /* Number crossfade — applied to KPI value spans when totals refresh.
+     Re-keyed so the animation re-runs on data change. */
+  .num-fade {
+    animation: num-fade 180ms ease-out both;
+  }
+
+  /* Custom thin scrollbar for dense vertical lists (e.g. PieChart legend). */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-zinc-200 rounded-full;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-zinc-300;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes num-fade {
+  from {
+    opacity: 0.4;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .fade-in,
+  .fade-in-up,
+  .num-fade {
+    animation: none !important;
+  }
+}

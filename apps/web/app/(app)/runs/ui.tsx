@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchApi } from "@/lib/client/fetch-api";
 
 type Store = { id: string; name: string };
@@ -17,21 +17,39 @@ type RunRow = {
 
 export default function RunsClient({
   initialStores = [],
+  initialStoreId = "",
+  initialRuns = [],
   canWrite = false,
 }: {
   initialStores?: Store[];
+  initialStoreId?: string;
+  initialRuns?: RunRow[];
   canWrite?: boolean;
 }) {
   const [stores] = useState<Store[]>(initialStores);
-  const [storeId, setStoreId] = useState(initialStores[0]?.id ?? "");
-  const [runs, setRuns] = useState<RunRow[]>([]);
+  const [storeId, setStoreId] = useState(
+    initialStoreId || initialStores[0]?.id || ""
+  );
+  // Hydrate from server-rendered runs so the table is populated on first
+  // paint instead of flashing "Loading...".
+  const [runs, setRuns] = useState<RunRow[]>(initialRuns);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hasStore = useMemo(() => Boolean(storeId), [storeId]);
 
+  // Skip the first refetch when the SSR'd runs already match the active
+  // store — they're already in state.
+  const dataIsFreshRef = useRef<boolean>(
+    !!initialRuns.length && storeId === initialStoreId
+  );
+
   useEffect(() => {
     if (!storeId) return;
+    if (dataIsFreshRef.current) {
+      dataIsFreshRef.current = false;
+      return;
+    }
     setLoading(true);
     setError(null);
     fetchApi<unknown[]>(`/api/runs?storeId=${storeId}`)
@@ -84,13 +102,13 @@ export default function RunsClient({
   };
 
   return (
-    <main className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <main className="fade-in-up space-y-6 min-w-0">
+      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-zinc-50/85 backdrop-blur-md border-b border-zinc-200/70 flex flex-wrap items-center justify-between gap-3 min-w-0">
         <h1 className="text-xl font-semibold">Runs</h1>
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-zinc-600">Store:</span>
+        <div className="flex items-center gap-2 text-sm min-w-0">
+          <span className="text-zinc-600 shrink-0">Store:</span>
           <select
-            className="rounded border px-2 py-1"
+            className="rounded border px-2 py-1 max-w-[220px] truncate"
             value={storeId}
             onChange={(e) => setStoreId(e.target.value)}
           >

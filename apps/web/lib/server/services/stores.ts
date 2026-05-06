@@ -5,18 +5,16 @@ import { requireOrgAdmin, requireStoreAccess } from "@/lib/server/authz";
 
 /**
  * Returns stores the current user can access in their active org.
+ *
+ * `tc.org.accessibleStoreIds` is already populated by `resolveTenantContext`
+ * (it filters to either all org stores for org_admin/platform admin, or just
+ * the user's StoreMembership-listed stores for everyone else). We reuse it
+ * here as the authoritative ID set so org admins don't re-scan the store
+ * table on every request.
  */
 export async function listAccessibleStores(
   tc: TenantContext
 ): Promise<StoreSummary[]> {
-  if (tc.user.isPlatformAdmin || tc.org.role === "org_admin") {
-    return prisma.store.findMany({
-      where: { organizationId: tc.org.organizationId },
-      select: { id: true, name: true, abbreviation: true },
-      orderBy: { name: "asc" },
-    });
-  }
-
   if (tc.org.accessibleStoreIds.length === 0) return [];
 
   return prisma.store.findMany({

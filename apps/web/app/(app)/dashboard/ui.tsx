@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { computeFullPicture } from "@/lib/fullPicture";
 import { DateRangePicker } from "@/components/DateRangePicker";
-import { BarChart } from "@/components/charts/BarChart";
+import { AreaChart } from "@/components/charts/AreaChart";
 import { PieChart } from "@/components/charts/PieChart";
 import { AdvisorDrawer } from "@/components/AdvisorDrawer";
 import { fetchApi } from "@/lib/client/fetch-api";
@@ -108,10 +108,19 @@ function cx(...classes: Array<string | false | null | undefined>) {
 
 function StatCard({ label, value, subtext }: { label: string; value: string; subtext?: string }) {
   return (
-    <div className="group rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:shadow-md">
+    <div className="group rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5">
       <div className="text-xs font-medium uppercase tracking-wider text-zinc-500">{label}</div>
-      <div className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 tabular-nums">{value}</div>
-      {subtext && <div className="mt-1 text-xs text-zinc-400">{subtext}</div>}
+      <div
+        key={value}
+        className="num-fade mt-2 text-2xl font-bold tracking-tight text-zinc-900 tabular-nums"
+      >
+        {value}
+      </div>
+      {subtext && (
+        <div key={subtext} className="num-fade mt-1 text-xs text-zinc-400">
+          {subtext}
+        </div>
+      )}
     </div>
   );
 }
@@ -162,37 +171,99 @@ function AdvisorName({ name, onClick }: { name: string; onClick: () => void }) {
   );
 }
 
+function StatSkeleton() {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+      <div className="h-3 w-24 rounded bg-zinc-100 animate-pulse" />
+      <div className="mt-3 h-7 w-32 rounded bg-zinc-100 animate-pulse" />
+      <div className="mt-2 h-3 w-16 rounded bg-zinc-100 animate-pulse" />
+    </div>
+  );
+}
+
+function ChartSkeleton() {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="h-4 w-32 rounded bg-zinc-100 animate-pulse" />
+      <div className="mt-4 h-44 w-full rounded bg-zinc-100 animate-pulse" />
+    </div>
+  );
+}
+
+function TableSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm space-y-3">
+      <div className="h-3 w-40 rounded bg-zinc-100 animate-pulse" />
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="h-9 w-full rounded bg-zinc-50 animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardClient({
   initialStores = [],
+  initialStoreId = "",
+  initialStartDate = "",
+  initialEndDate = "",
+  initialData = null,
 }: {
   initialStores?: Store[];
+  initialStoreId?: string;
+  initialStartDate?: string;
+  initialEndDate?: string;
+  initialData?: DashboardResponse | null;
 }) {
   const [stores] = useState<Store[]>(initialStores);
-  const [storeId, setStoreId] = useState<string>(initialStores[0]?.id ?? "");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [storeId, setStoreId] = useState<string>(
+    initialStoreId || initialStores[0]?.id || ""
+  );
+  const [startDate, setStartDate] = useState<string>(initialStartDate);
+  const [endDate, setEndDate] = useState<string>(initialEndDate);
 
   const [tab, setTab] = useState<Tab>("Full Picture");
   const [rollup, setRollup] = useState<"sum" | "avg_per_day">("sum");
 
-  const [data, setData] = useState<DashboardResponse | null>(null);
+  // Hydrate state from server-rendered initialData so the dashboard renders
+  // populated on first paint instead of flashing a blank loading state.
+  const [data, setData] = useState<DashboardResponse | null>(initialData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [selectedAdvisor, setSelectedAdvisor] = useState<{ id: string; name: string } | null>(null);
   const openAdvisor = useCallback((id: string, name: string) => setSelectedAdvisor({ id, name }), []);
 
+  // Tracks whether the data currently in state matches the active filters.
+  // Seeded `true` when the server pre-rendered a matching dataset; flipped
+  // back to `false` whenever filters change so the next effect refetches.
+  const initialMatches =
+    !!initialData &&
+    initialData.store?.id === (initialStoreId || initialStores[0]?.id) &&
+    initialData.dateRange?.startDate === initialStartDate &&
+    initialData.dateRange?.endDate === initialEndDate;
+  const dataIsFreshRef = useRef<boolean>(initialMatches);
+
+  // Fallback: if the server didn't pass dates (e.g. initial render had no
+  // store), default to month-to-date once a store becomes available.
   useEffect(() => {
     if (!storeId) return;
+    if (startDate && endDate) return;
     const now = new Date();
     const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     setStartDate((prev) => prev || first.toISOString().slice(0, 10));
     setEndDate((prev) => prev || today.toISOString().slice(0, 10));
-  }, [storeId]);
+  }, [storeId, startDate, endDate]);
 
   useEffect(() => {
     if (!storeId || !startDate || !endDate) return;
+    // First render and the SSR'd data already matches active filters —
+    // skip the network round-trip entirely. Subsequent filter changes
+    // (which flip `dataIsFreshRef` to false above) refetch normally.
+    if (dataIsFreshRef.current) {
+      dataIsFreshRef.current = false;
+      return;
+    }
     setLoading(true);
     setError(null);
     setData(null);
@@ -319,23 +390,23 @@ export default function DashboardClient({
   const commodityMix = data?.commodityMix ?? [];
 
   return (
-    <main className="space-y-8 pb-20">
+    <main className="fade-in-up space-y-8 pb-20 min-w-0">
       {/* Header & Filters */}
       <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+        <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-zinc-50/85 backdrop-blur-md border-b border-zinc-200/70 flex flex-wrap items-end justify-between gap-4 min-w-0">
+          <div className="min-w-0">
             <h1 className="text-3xl font-bold tracking-tight text-zinc-900">Dashboard</h1>
             <p className="mt-1 text-sm text-zinc-500">Performance metrics and advisor insights.</p>
           </div>
 
-          {/* Segmented Control for Tabs - Top Level */}
-          <div className="hidden md:flex bg-zinc-100/80 p-1 rounded-lg">
+          {/* Tab control — wraps to a second line on tight widths */}
+          <div className="flex flex-wrap gap-1 bg-zinc-100/80 p-1 rounded-lg max-w-full">
             {TABS.map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={cx(
-                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                  "px-3 sm:px-4 py-1.5 text-sm font-medium rounded-md transition-all whitespace-nowrap",
                   tab === t
                     ? "bg-white text-zinc-900 shadow-sm ring-1 ring-black/5"
                     : "text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200/50"
@@ -348,27 +419,9 @@ export default function DashboardClient({
         </div>
 
         {/* Filter Bar */}
-        <div className="flex flex-col lg:flex-row lg:items-center gap-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-          {/* Mobile Tabs Fallback */}
-          <div className="md:hidden overflow-x-auto pb-2">
-            <div className="flex gap-2">
-              {TABS.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className={cx(
-                    "whitespace-nowrap px-3 py-1.5 text-sm font-medium rounded-md border",
-                    tab === t ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-700 border-zinc-200"
-                  )}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
-            <div className="space-y-1.5">
+        <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 w-full">
+            <div className="space-y-1.5 min-w-0">
               <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Store</label>
               <select
                 className="w-full rounded-md border-zinc-300 py-2 text-sm shadow-sm focus:border-zinc-500 focus:ring-zinc-500"
@@ -381,9 +434,9 @@ export default function DashboardClient({
               </select>
             </div>
 
-            <div className="space-y-1.5 col-span-2">
+            <div className="space-y-1.5 min-w-0 sm:col-span-2 xl:col-span-2">
               <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Date Range</label>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <DateRangePicker
                   startDate={startDate}
                   endDate={endDate}
@@ -425,7 +478,7 @@ export default function DashboardClient({
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Rollup</label>
               <div className="flex rounded-md shadow-sm">
                 <button
@@ -454,10 +507,21 @@ export default function DashboardClient({
       </div>
 
       {/* Content Area */}
-      <div className="transition-opacity duration-300 ease-in-out">
+      <div key={tab} className="min-w-0 fade-in">
         {tab === "Full Picture" && (
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
+          loading && !data ? (
+            <div className="space-y-6 min-w-0">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => <StatSkeleton key={i} />)}
+              </div>
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 3 }).map((_, i) => <ChartSkeleton key={i} />)}
+              </div>
+              <TableSkeleton rows={5} />
+            </div>
+          ) : (
+          <div className="space-y-6 min-w-0">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
               <StatCard label="Open ROs" value={fmtCount(totals.openRosTotal)} />
               <StatCard label="Total Daily Gross" value={fmtMoney(totals.totalDailyGross)} />
               <StatCard label="Advisors Active" value={fullPictureRows.length.toString()} />
@@ -467,20 +531,20 @@ export default function DashboardClient({
               <StatCard label="Rec Closing %" value={pct(totals.recClosingPct)} subtext={`${fmtMoney(totals.recSoldAmountTotal)} Sold`} />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
 
-              <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-                <BarChart title="Open ROs Trend" data={series.map((d) => ({ label: d.date.slice(5), value: d.openRos }))} color="#6366f1" />
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0">
+                <AreaChart title="Open ROs Trend" data={series.map((d) => ({ label: d.date.slice(5), value: d.openRos }))} color="#6366f1" />
               </div>
-              <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-                <BarChart title="Gross Trend" data={series.map((d) => ({ label: d.date.slice(5), value: d.dailyGross }))} valueFormatter={money} color="#10b981" />
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0">
+                <AreaChart title="Gross Trend" data={series.map((d) => ({ label: d.date.slice(5), value: d.dailyGross }))} valueFormatter={money} color="#10b981" />
               </div>
-              <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-                <BarChart title="Commodity Qty Trend" data={series.map((d) => ({ label: d.date.slice(5), value: d.commodityQty }))} color="#f59e0b" />
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0">
+                <AreaChart title="Commodity Qty Trend" data={series.map((d) => ({ label: d.date.slice(5), value: d.commodityQty }))} color="#f59e0b" />
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 min-w-0">
               <SectionHeading title="Advisor Performance" description="Detailed breakdown by advisor." />
               <TableContainer>
                 <table className="min-w-full divide-y divide-zinc-200">
@@ -524,11 +588,12 @@ export default function DashboardClient({
               </TableContainer>
             </div>
           </div>
+          )
         )}
 
         {tab === "Menu Sales" && (
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-4">
+          <div className="space-y-6 min-w-0">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
               <StatCard label="Menu Count" value={fmtCount(totals.menuCountTotal)} />
               <StatCard label="Sales %" value={pct(totals.menuSalesPct)} />
               <StatCard label="Labor Gross" value={fmtMoney(totals.menuLaborGrossTotal)} />
@@ -563,8 +628,8 @@ export default function DashboardClient({
         )}
 
         {tab === "A-La-Carte" && (
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-4">
+          <div className="space-y-6 min-w-0">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
               <StatCard label="ALC Count" value={fmtCount(totals.alaCountTotal)} />
               <StatCard label="Sales %" value={pct(totals.alaPct)} />
               <StatCard label="Labor Gross" value={fmtMoney(totals.alaLaborGrossTotal)} />
@@ -598,9 +663,9 @@ export default function DashboardClient({
         )}
 
         {tab === "Commodity Sales" && (
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className="space-y-6 min-w-0">
+            <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm min-w-0">
                 <PieChart
                   title="Commodity Mix"
                   data={COMMODITY_ORDER.map(({ key, label }) => ({
@@ -649,8 +714,8 @@ export default function DashboardClient({
         )}
 
         {tab === "Closing %" && (
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-6 min-w-0">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
               <StatCard label="Closing %" value={pct(totals.recClosingPct)} />
               <StatCard label="Rec Amount" value={fmtMoney(totals.recAmountTotal)} />
               <StatCard label="Sold Amount" value={fmtMoney(totals.recSoldAmountTotal)} />

@@ -43,9 +43,11 @@ export default async function AppLayout({
   };
 
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[auto_1fr]">
+    <div className="min-h-screen lg:grid lg:grid-cols-[auto_minmax(0,1fr)]">
       <Sidebar user={sidebarUser} />
-      <div className="mx-auto w-full max-w-6xl px-4 py-6">{children}</div>
+      <div className="min-w-0 mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        {children}
+      </div>
     </div>
   );
 }

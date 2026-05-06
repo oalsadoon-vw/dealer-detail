@@ -149,8 +149,8 @@ export function EmailSourcesPanel({
       )}
 
       {sources.length > 0 ? (
-        <div className="rounded-lg border border-zinc-800 overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="rounded-lg border border-zinc-800 overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm">
             <thead className="border-b border-zinc-800 bg-zinc-900/50">
               <tr>
                 <th className="text-left p-3 text-zinc-400 font-medium">

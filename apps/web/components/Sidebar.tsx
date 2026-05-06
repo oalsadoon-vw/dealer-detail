@@ -88,16 +88,36 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
+const COLLAPSED_STORAGE_KEY = "sidebar:collapsed";
+
 export default function Sidebar({ user }: { user?: SidebarUser }) {
   const pathname = usePathname() ?? "/";
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsedState] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
 
   const isOrgAdmin = user?.role === "org_admin" || user?.isPlatformAdmin;
+
+  // The sidebar defaults to expanded. Only the user's stored manual toggle
+  // overrides that — we never auto-collapse based on viewport width, since
+  // the lg+ content area always has room for the 260px sidebar.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(COLLAPSED_STORAGE_KEY);
+    if (stored === "1" || stored === "0") {
+      setCollapsedState(stored === "1");
+    }
+  }, []);
+
+  const setCollapsed = (next: boolean) => {
+    setCollapsedState(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(COLLAPSED_STORAGE_KEY, next ? "1" : "0");
+    }
+  };
 
   const items: NavItem[] = useMemo(
     () => [
@@ -146,11 +166,14 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
   const initials = displayName.charAt(0).toUpperCase();
   const hasMultipleOrgs = (user?.orgs?.length ?? 0) > 1;
 
-  const sidebarContent = (
+  // Render the sidebar's contents at a given collapsed state. The desktop
+  // sticky sidebar uses the live `collapsed` state; the mobile drawer always
+  // passes `false` so labels are visible inside the 280px drawer panel.
+  const renderSidebarContent = (isCollapsed: boolean) => (
     <aside
       className={cx(
         "flex flex-col h-full border-r border-zinc-800 bg-zinc-950 text-white",
-        collapsed ? "w-[72px]" : "w-[260px]",
+        isCollapsed ? "w-[72px]" : "w-[260px]",
         "transition-[width] duration-200 ease-out"
       )}
     >
@@ -158,14 +181,14 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
       <div
         className={cx(
           "flex h-16 items-center border-b border-zinc-900",
-          collapsed ? "justify-center px-2" : "justify-between gap-2 pl-4 pr-2"
+          isCollapsed ? "justify-center px-2" : "justify-between gap-2 pl-4 pr-2"
         )}
       >
         <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
           <div className="shrink-0">
             <BrandMark size="sm" variant="dark" />
           </div>
-          {!collapsed && (
+          {!isCollapsed && (
             <div className="min-w-0">
               <span className="font-semibold text-zinc-100 whitespace-nowrap block text-sm tracking-tight">
                 {BRAND_NAME}
@@ -178,10 +201,10 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
             </div>
           )}
         </div>
-        {!collapsed && (
+        {!isCollapsed && (
           <button
             type="button"
-            className="hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:text-white hover:bg-zinc-900 transition-colors"
+            className="hidden lg:flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:text-white hover:bg-zinc-900 transition-colors"
             onClick={() => setCollapsed(true)}
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
@@ -193,9 +216,9 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
         )}
       </div>
 
-      {/* Expand toggle — own row, only when collapsed (md+) */}
-      {collapsed && (
-        <div className="hidden md:flex justify-center border-b border-zinc-900 py-1.5">
+      {/* Expand toggle — own row, only when collapsed (lg+) */}
+      {isCollapsed && (
+        <div className="hidden lg:flex justify-center border-b border-zinc-900 py-1.5">
           <button
             type="button"
             className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:text-white hover:bg-zinc-900 transition-colors"
@@ -211,7 +234,7 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
       )}
 
       {/* Org switcher (only if multiple orgs, expanded mode) */}
-      {!collapsed && hasMultipleOrgs && (
+      {!isCollapsed && hasMultipleOrgs && (
         <div className="px-2 pt-3 pb-1 relative">
           <button
             onClick={() => setOrgDropdownOpen((v) => !v)}
@@ -243,7 +266,7 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
       )}
 
       <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
-        {!collapsed && (
+        {!isCollapsed && (
           <div className="px-2 mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
             Navigation
           </div>
@@ -261,7 +284,7 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
                   ? "bg-zinc-900 text-white shadow-sm ring-1 ring-inset ring-zinc-800"
                   : "text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200"
               )}
-              title={collapsed ? item.label : undefined}
+              title={isCollapsed ? item.label : undefined}
             >
               <div
                 className={cx(
@@ -271,14 +294,14 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
               >
                 {item.icon}
               </div>
-              {!collapsed && <div>{item.label}</div>}
+              {!isCollapsed && <div>{item.label}</div>}
             </Link>
           );
         })}
 
         {isOrgAdmin && (
           <>
-            {!collapsed && (
+            {!isCollapsed && (
               <div className="px-2 mt-4 mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
                 Admin
               </div>
@@ -291,18 +314,18 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
                   ? "bg-zinc-900 text-white shadow-sm ring-1 ring-inset ring-zinc-800"
                   : "text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200"
               )}
-              title={collapsed ? "Settings" : undefined}
+              title={isCollapsed ? "Settings" : undefined}
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              {!collapsed && <div>Settings</div>}
+              {!isCollapsed && <div>Settings</div>}
             </Link>
           </>
         )}
 
-        {user?.isPlatformAdmin && !collapsed && (
+        {user?.isPlatformAdmin && !isCollapsed && (
           <>
             <div className="px-2 mt-4 mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
               Platform
@@ -318,7 +341,7 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
             </Link>
           </>
         )}
-        {user?.isPlatformAdmin && collapsed && (
+        {user?.isPlatformAdmin && isCollapsed && (
           <Link
             href="/admin"
             title="Admin Portal"
@@ -333,7 +356,7 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
 
       {/* User footer */}
       <div className="p-4 border-t border-zinc-900">
-        {!collapsed ? (
+        {!isCollapsed ? (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 shrink-0 rounded-full bg-zinc-800 grid place-items-center text-xs text-zinc-400 font-medium">
@@ -376,8 +399,8 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
 
   return (
     <>
-      {/* Mobile top bar */}
-      <div className="md:hidden flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4">
+      {/* Mobile top bar (shown below lg) */}
+      <div className="lg:hidden flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4">
         <div className="flex items-center gap-2 min-w-0">
           <BrandMark size="sm" variant="dark" />
           <div className="min-w-0">
@@ -399,20 +422,21 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
         </button>
       </div>
 
-      {/* Desktop sidebar */}
-      <div className="hidden md:block h-full sticky top-0 self-start max-h-screen overflow-hidden">
-        {sidebarContent}
+      {/* Desktop sidebar (lg+) — uses the live collapsed state */}
+      <div className="hidden lg:block h-full sticky top-0 self-start max-h-screen overflow-hidden">
+        {renderSidebarContent(collapsed)}
       </div>
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer (below lg) — always renders expanded; the 280px panel
+          has plenty of room for full nav labels. */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-50 lg:hidden">
           <div
             className="absolute inset-0 bg-zinc-900/50 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
           <div className="absolute inset-y-0 left-0 w-[280px] bg-zinc-950 shadow-xl">
-            {sidebarContent}
+            {renderSidebarContent(false)}
           </div>
         </div>
       )}

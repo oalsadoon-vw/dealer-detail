@@ -18,6 +18,22 @@ export async function resolveInvitesForUser(
   profileId: string,
   email: string
 ): Promise<{ accepted: number; resolved: ResolvedInvite[] }> {
+  // Fast path: in the steady state most signed-in requests have zero
+  // pending invites. A `count()` against the indexed columns avoids
+  // pulling row data on the hot path. We still re-run `findMany` below
+  // when there's actual work to do.
+  const pendingCount = await prisma.invite.count({
+    where: {
+      email: { equals: email, mode: "insensitive" },
+      acceptedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+  });
+
+  if (pendingCount === 0) {
+    return { accepted: 0, resolved: [] };
+  }
+
   const pendingInvites = await prisma.invite.findMany({
     where: {
       email: { equals: email, mode: "insensitive" },
@@ -26,10 +42,6 @@ export async function resolveInvitesForUser(
     },
     orderBy: { createdAt: "asc" },
   });
-
-  if (pendingInvites.length === 0) {
-    return { accepted: 0, resolved: [] };
-  }
 
   const resolved: ResolvedInvite[] = [];
 

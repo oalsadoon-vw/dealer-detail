@@ -62,10 +62,10 @@ export function PieChart(props: {
   }, [cleaned, total]);
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full min-w-0">
       <div className="mb-4 text-sm font-semibold text-zinc-700">{props.title}</div>
-      <div className="flex flex-col sm:flex-row items-center gap-6">
-        <svg viewBox="0 0 220 220" className="w-52 h-52 shrink-0">
+      <div className="flex flex-col sm:flex-row items-center gap-6 min-w-0">
+        <svg viewBox="0 0 220 220" className="w-44 h-44 sm:w-52 sm:h-52 shrink-0">
           {slices.map((s) => (
             <g key={s.label} className="group cursor-pointer">
               <path
@@ -88,16 +88,16 @@ export function PieChart(props: {
           </text>
         </svg>
 
-        <div className="flex-1 space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+        <div className="w-full flex-1 min-w-0 space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
           {slices.map((s) => (
-            <div key={s.label} className="flex items-center justify-between gap-3 text-sm group">
-              <div className="flex items-center gap-2">
-                <span className="inline-block h-3 w-3 rounded-full shadow-sm" style={{ background: s.color }} />
-                <span className="text-zinc-600 font-medium group-hover:text-zinc-900 transition-colors truncate max-w-[120px]" title={s.label}>
+            <div key={s.label} className="flex items-center justify-between gap-3 text-sm group min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="inline-block h-3 w-3 rounded-full shadow-sm shrink-0" style={{ background: s.color }} />
+                <span className="text-zinc-600 font-medium group-hover:text-zinc-900 transition-colors truncate" title={s.label}>
                   {s.label}
                 </span>
               </div>
-              <div className="font-mono text-zinc-700 font-semibold">{fmt(s.value)}</div>
+              <div className="font-mono text-zinc-700 font-semibold shrink-0 truncate">{fmt(s.value)}</div>
             </div>
           ))}
           {cleaned.length === 0 && <div className="text-sm text-zinc-400 italic">No data available</div>}

@@ -62,8 +62,8 @@ export default async function InvitesPage() {
       <div>
         <h2 className="font-medium mb-3">Invite History ({invites.length})</h2>
         {invites.length > 0 ? (
-          <div className="rounded-lg border bg-white overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="rounded-lg border bg-white overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
               <thead className="border-b bg-zinc-50 text-left">
                 <tr>
                   <th className="p-3 font-medium text-zinc-500">Email</th>

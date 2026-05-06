@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { BarChart } from "@/components/charts/BarChart";
+import { AreaChart } from "@/components/charts/AreaChart";
 import { PieChart } from "@/components/charts/PieChart";
 
 type AdvisorData = {
@@ -224,20 +224,20 @@ export function AdvisorDrawer({
           )}
 
           {data && m && (
-            <div className="space-y-6 p-6">
+            <div className="space-y-6 p-4 sm:p-6 min-w-0">
               {/* KPI Cards */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Stat label="Open ROs" value={int0(m.openRos)} />
                 <Stat label="Daily Gross" value={money(totalDailyGross)} accent="text-emerald-700" />
                 <Stat label="Rec Close %" value={pct(m.recSoldAmount, m.recAmount)} accent={m.recAmount > 0 && m.recSoldAmount / m.recAmount >= 0.5 ? "text-emerald-700" : "text-zinc-900"} />
               </div>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Stat label="Menu Count" value={int0(m.menuCount)} />
                 <Stat label="Menu %" value={pct(m.menuCount, m.openRos)} />
                 <Stat label="ALC Count" value={int0(m.alaCount)} />
                 <Stat label="ALC %" value={pct(m.alaCount, m.openRos)} />
               </div>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Stat label="Comm Qty" value={int0(totalCommQty)} />
                 <Stat label="Comm %" value={pct(totalCommQty, m.openRos)} />
                 <Stat label="Rec Sold" value={money(m.recSoldAmount)} />
@@ -250,31 +250,31 @@ export function AdvisorDrawer({
               {/* Trend Charts */}
               <div>
                 <h3 className="text-sm font-semibold text-zinc-800 mb-3">Daily Trends</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                    <BarChart
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="rounded-xl border border-zinc-200 bg-white p-4 min-w-0">
+                    <AreaChart
                       title="Open ROs"
                       data={series.map((d) => ({ label: d.date.slice(5), value: d.openRos }))}
                       color="#6366f1"
                     />
                   </div>
-                  <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                    <BarChart
+                  <div className="rounded-xl border border-zinc-200 bg-white p-4 min-w-0">
+                    <AreaChart
                       title="Daily Gross"
                       data={series.map((d) => ({ label: d.date.slice(5), value: d.dailyGross }))}
                       color="#10b981"
                       valueFormatter={money}
                     />
                   </div>
-                  <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                    <BarChart
+                  <div className="rounded-xl border border-zinc-200 bg-white p-4 min-w-0">
+                    <AreaChart
                       title="Menu Count"
                       data={series.map((d) => ({ label: d.date.slice(5), value: d.menuCount }))}
                       color="#3b82f6"
                     />
                   </div>
-                  <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                    <BarChart
+                  <div className="rounded-xl border border-zinc-200 bg-white p-4 min-w-0">
+                    <AreaChart
                       title="Commodity Qty"
                       data={series.map((d) => ({ label: d.date.slice(5), value: d.commodityQty }))}
                       color="#f59e0b"
@@ -287,8 +287,8 @@ export function AdvisorDrawer({
               <div className="border-t border-zinc-100" />
 
               {/* Commodity & Sales Breakdown */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-xl border border-zinc-200 bg-white p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-zinc-200 bg-white p-4 min-w-0">
                   <PieChart
                     title="Commodity Mix"
                     data={commMix.map((c) => ({
@@ -298,7 +298,7 @@ export function AdvisorDrawer({
                     valueFormatter={int0}
                   />
                 </div>
-                <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                <div className="rounded-xl border border-zinc-200 bg-white p-4 min-w-0">
                   <PieChart
                     title="Gross Breakdown"
                     data={salesBreakdown}
@@ -313,8 +313,8 @@ export function AdvisorDrawer({
               {/* Gross Detail */}
               <div>
                 <h3 className="text-sm font-semibold text-zinc-800 mb-3">Gross Summary</h3>
-                <div className="overflow-hidden rounded-xl border border-zinc-200">
-                  <table className="min-w-full text-sm">
+                <div className="overflow-x-auto rounded-xl border border-zinc-200">
+                  <table className="w-full min-w-[560px] text-sm">
                     <thead>
                       <tr className="bg-zinc-50/80">
                         <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Category</th>
@@ -355,8 +355,8 @@ export function AdvisorDrawer({
               {commMix.length > 0 && (
                 <div>
                   <h3 className="text-sm font-semibold text-zinc-800 mb-3">Commodity Detail</h3>
-                  <div className="overflow-hidden rounded-xl border border-zinc-200">
-                    <table className="min-w-full text-sm">
+                  <div className="overflow-x-auto rounded-xl border border-zinc-200">
+                    <table className="w-full min-w-[600px] text-sm">
                       <thead>
                         <tr className="bg-zinc-50/80">
                           <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Commodity</th>
@@ -392,7 +392,7 @@ export function AdvisorDrawer({
               {/* Recommendations Detail */}
               <div>
                 <h3 className="text-sm font-semibold text-zinc-800 mb-3">Recommendations</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <Stat label="Rec Count" value={int0(m.recCount)} />
                   <Stat label="Rec Sold" value={int0(m.recSoldCount)} />
                   <Stat label="Opportunity" value={money(m.recAmount)} />
