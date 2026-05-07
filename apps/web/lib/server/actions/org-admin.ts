@@ -118,6 +118,60 @@ export async function createInviteAction(
   };
 }
 
+/**
+ * Cancels a pending invite within the current org. Used by the
+ * settings/invites table. The same email can be re-invited immediately
+ * afterwards. Already-accepted invites are not cancellable — use the
+ * members page to remove the membership instead.
+ */
+export async function cancelInviteAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const tc = await resolveOrgAdminContext();
+  const orgId = tc.org.organizationId;
+
+  const inviteId = (formData.get("inviteId") as string)?.trim();
+  if (!inviteId) return { ok: false, error: "Invite ID is required" };
+
+  const invite = await prisma.invite.findUnique({
+    where: { id: inviteId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      organizationId: true,
+      acceptedAt: true,
+    },
+  });
+
+  if (!invite) return { ok: false, error: "Invite not found" };
+  if (invite.organizationId !== orgId) {
+    return { ok: false, error: "Invite does not belong to your organization" };
+  }
+  if (invite.acceptedAt) {
+    return {
+      ok: false,
+      error:
+        "This invite has already been accepted. Remove the membership from the Members page instead.",
+    };
+  }
+
+  await prisma.invite.delete({ where: { id: inviteId } });
+
+  await audit({
+    actorId: tc.user.profileId,
+    actorEmail: tc.user.email,
+    action: "invite.cancel",
+    targetType: "invite",
+    targetId: inviteId,
+    organizationId: orgId,
+    metadata: { email: invite.email, role: invite.role },
+  });
+
+  revalidatePath("/settings/invites");
+  return { ok: true };
+}
+
 export async function updateMemberRoleAction(
   formData: FormData
 ): Promise<ActionResult> {

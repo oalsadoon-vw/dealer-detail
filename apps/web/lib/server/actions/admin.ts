@@ -219,6 +219,55 @@ export async function createInviteForOrgAction(
   };
 }
 
+/**
+ * Cancels a pending invite. Used by the platform-admin "Cancel" / "Remove"
+ * button on the org detail invites table. Hard-deletes the row so the same
+ * email can be re-invited immediately. Already-accepted invites are
+ * blocked (they're history — use the membership page to remove access).
+ */
+export async function cancelInviteForOrgAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const admin = await resolveAdminContext();
+
+  const inviteId = (formData.get("inviteId") as string)?.trim();
+  if (!inviteId) return { ok: false, error: "Invite ID is required" };
+
+  const invite = await prisma.invite.findUnique({
+    where: { id: inviteId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      organizationId: true,
+      acceptedAt: true,
+    },
+  });
+
+  if (!invite) return { ok: false, error: "Invite not found" };
+  if (invite.acceptedAt) {
+    return {
+      ok: false,
+      error:
+        "This invite has already been accepted. Remove the membership instead.",
+    };
+  }
+
+  await prisma.invite.delete({ where: { id: inviteId } });
+
+  await audit({
+    actorId: admin.profileId,
+    actorEmail: admin.email,
+    action: "invite.cancel",
+    targetType: "invite",
+    targetId: inviteId,
+    organizationId: invite.organizationId,
+    metadata: { email: invite.email, role: invite.role },
+  });
+
+  return { ok: true };
+}
+
 /* ───────────────────────────────────────────────────────────────────────────
  * Org / store lifecycle: move and delete
  * ─────────────────────────────────────────────────────────────────────────── */

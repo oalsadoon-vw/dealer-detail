@@ -10,6 +10,7 @@ import {
   EmptyState,
 } from "@/components/ui";
 import { InviteForm } from "./invite-form";
+import { CancelInviteButton } from "./cancel-invite-button";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export default async function InvitesPage() {
 
         {invites.length > 0 ? (
           <div className="rounded-lg border border-line bg-surface overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-surface-2/60 text-fg-subtle">
                 <tr className="border-b border-line">
                   <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-4 py-3">
@@ -77,6 +78,9 @@ export default async function InvitesPage() {
                   <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-4 py-3">
                     Sent
                   </th>
+                  <th className="text-right text-[10px] font-semibold uppercase tracking-wider px-4 py-3">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-subtle">
@@ -84,6 +88,7 @@ export default async function InvitesPage() {
                   const isPending =
                     !inv.acceptedAt && inv.expiresAt > new Date();
                   const isAccepted = !!inv.acceptedAt;
+                  const canCancel = !isAccepted;
                   return (
                     <tr
                       key={inv.id}
@@ -106,6 +111,16 @@ export default async function InvitesPage() {
                       </td>
                       <td className="px-4 py-3 text-fg-muted">
                         {inv.createdAt.toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {canCancel ? (
+                          <CancelInviteButton
+                            inviteId={inv.id}
+                            email={inv.email}
+                          />
+                        ) : (
+                          <span className="text-xs text-fg-subtle">—</span>
+                        )}
                       </td>
                     </tr>
                   );

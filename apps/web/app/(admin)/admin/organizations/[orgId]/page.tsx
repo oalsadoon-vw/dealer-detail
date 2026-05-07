@@ -12,6 +12,7 @@ import { MoveStoreControl } from "./move-store-control";
 import { DeleteStoreButton } from "./delete-store-button";
 import { DeleteOrganizationButton } from "./delete-organization-button";
 import { EmailSourcesPanel } from "./email-sources-panel";
+import { CancelInviteButton } from "./cancel-invite-button";
 
 export const dynamic = "force-dynamic";
 
@@ -313,7 +314,7 @@ export default async function OrgDetailPage({
         />
         {invites.length > 0 ? (
           <div className="rounded-lg border border-line bg-surface overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[820px] text-sm">
               <thead className="bg-surface-2/60 text-fg-subtle">
                 <tr className="border-b border-line">
                   <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
@@ -331,6 +332,9 @@ export default async function OrgDetailPage({
                   <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
                     Created
                   </th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-subtle">
@@ -340,6 +344,11 @@ export default async function OrgDetailPage({
                   const isAccepted = !!inv.acceptedAt;
                   const isExpired =
                     !inv.acceptedAt && inv.expiresAt <= new Date();
+                  // Pending and expired invites are still cancellable —
+                  // expired rows just clutter the list and admins should be
+                  // able to clean them up. Accepted rows are history; they
+                  // are gated by `acceptedAt` inside the server action.
+                  const canCancel = !isAccepted;
                   return (
                     <tr
                       key={inv.id}
@@ -361,6 +370,16 @@ export default async function OrgDetailPage({
                       </td>
                       <td className="px-4 py-3 text-fg-muted">
                         {inv.createdAt.toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {canCancel ? (
+                          <CancelInviteButton
+                            inviteId={inv.id}
+                            email={inv.email}
+                          />
+                        ) : (
+                          <span className="text-xs text-fg-subtle">—</span>
+                        )}
                       </td>
                     </tr>
                   );
