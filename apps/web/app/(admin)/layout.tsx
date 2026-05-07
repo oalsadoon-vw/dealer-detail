@@ -17,6 +17,8 @@ export default async function AdminLayout({
 
   if (!user.isPlatformAdmin) redirect("/dashboard");
 
+  const hasOrgAccess = user.memberships.length > 0;
+
   return (
     <div className="min-h-screen bg-canvas text-fg">
       <header className="border-b border-line bg-surface/80 backdrop-blur-md sticky top-0 z-40">
@@ -50,9 +52,11 @@ export default async function AdminLayout({
               {user.email}
             </span>
             <ThemeToggle />
-            <LinkButton href="/dashboard" variant="secondary" size="sm">
-              Back to app
-            </LinkButton>
+            {hasOrgAccess && (
+              <LinkButton href="/dashboard" variant="secondary" size="sm">
+                Back to app
+              </LinkButton>
+            )}
           </div>
         </div>
       </header>
