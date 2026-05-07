@@ -41,12 +41,12 @@ export function DeleteStoreButton({
         type="button"
         onClick={handleClick}
         disabled={pending}
-        className="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+        className="text-xs font-medium text-danger hover:text-danger/80 transition-colors disabled:opacity-50"
       >
         {pending ? "Deleting..." : "Delete"}
       </button>
       {error && (
-        <span className="text-[10px] text-red-400 mt-0.5">{error}</span>
+        <span className="mt-0.5 text-[10px] text-danger">{error}</span>
       )}
     </div>
   );

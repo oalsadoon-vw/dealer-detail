@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchApi } from "@/lib/client/fetch-api";
+import {
+  Badge,
+  Card,
+  EmptyState,
+  SectionHeading,
+  Select,
+} from "@/components/ui";
 
 type Store = { id: string; name: string };
 type RunRow = {
@@ -13,6 +20,13 @@ type RunRow = {
   status: string;
   createdAt: string;
   files: Array<{ id: string }>;
+};
+
+const STATUS_TONE: Record<string, "success" | "danger" | "warning" | "neutral"> = {
+  COMPLETED: "success",
+  FAILED: "danger",
+  RUNNING: "warning",
+  PENDING: "warning",
 };
 
 export default function RunsClient({
@@ -30,16 +44,12 @@ export default function RunsClient({
   const [storeId, setStoreId] = useState(
     initialStoreId || initialStores[0]?.id || ""
   );
-  // Hydrate from server-rendered runs so the table is populated on first
-  // paint instead of flashing "Loading...".
   const [runs, setRuns] = useState<RunRow[]>(initialRuns);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hasStore = useMemo(() => Boolean(storeId), [storeId]);
 
-  // Skip the first refetch when the SSR'd runs already match the active
-  // store — they're already in state.
   const dataIsFreshRef = useRef<boolean>(
     !!initialRuns.length && storeId === initialStoreId
   );
@@ -103,161 +113,183 @@ export default function RunsClient({
 
   return (
     <main className="fade-in-up space-y-6 min-w-0">
-      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-zinc-50/85 backdrop-blur-md border-b border-zinc-200/70 flex flex-wrap items-center justify-between gap-3 min-w-0">
-        <h1 className="text-xl font-semibold">Runs</h1>
-        <div className="flex items-center gap-2 text-sm min-w-0">
-          <span className="text-zinc-600 shrink-0">Store:</span>
-          <select
-            className="rounded border px-2 py-1 max-w-[220px] truncate"
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <SectionHeading
+          title="Runs"
+          description="Ingestion history for the selected store. Click a row to view its detail."
+          size="page"
+        />
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+            Store
+          </span>
+          <Select
             value={storeId}
             onChange={(e) => setStoreId(e.target.value)}
+            className="min-w-[220px] max-w-[280px] truncate"
           >
             {stores.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
 
       {!hasStore ? (
-        <div className="rounded border bg-white p-4 text-sm">
-          No stores found. Contact your organization admin.
-        </div>
-      ) : null}
-      {error ? (
-        <div className="rounded border bg-white p-4 text-sm text-red-700">
-          Error: {error}
-        </div>
+        <Card>
+          <EmptyState
+            title="No stores assigned"
+            description="Contact your organization admin to grant access to a store."
+          />
+        </Card>
+      ) : error ? (
+        <Card>
+          <div className="text-sm text-danger-fg">Error: {error}</div>
+        </Card>
       ) : null}
 
-      <div className="rounded-lg border bg-white overflow-auto">
-        <table className="min-w-[900px] w-full text-sm">
-          <thead className="border-b bg-zinc-50 text-left">
-            <tr>
-              <th className="p-3">Business date</th>
-              <th className="p-3">Batch #</th>
-              <th className="p-3">Status</th>
-              <th className="p-3">Files</th>
-              <th className="p-3">Created</th>
-              {canWrite && <th className="p-3 w-24"></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {runs.map((r) => (
-              <tr key={r.id} className="border-b last:border-b-0 group">
-                <td className="p-3">
-                  <Link className="underline" href={`/runs/${r.id}`}>
-                    {r.businessDate}
-                  </Link>
-                </td>
-                <td className="p-3 font-mono">{r.batchNo}</td>
-                <td className="p-3">
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                      r.status === "COMPLETED"
-                        ? "bg-green-100 text-green-700"
-                        : r.status === "FAILED"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-zinc-100 text-zinc-700"
-                    }`}
+      {hasStore ? (
+        <Card padded={false} className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-[900px] w-full text-sm">
+              <thead className="bg-surface-2/60 text-left text-xs uppercase tracking-wider text-fg-muted">
+                <tr className="border-b border-line">
+                  <th className="px-4 py-3 font-semibold">Business date</th>
+                  <th className="px-4 py-3 font-semibold">Batch #</th>
+                  <th className="px-4 py-3 font-semibold">Status</th>
+                  <th className="px-4 py-3 font-semibold">Files</th>
+                  <th className="px-4 py-3 font-semibold">Created</th>
+                  {canWrite && <th className="px-4 py-3 w-28"></th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-subtle">
+                {runs.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="group transition-colors hover:bg-surface-2/40"
                   >
-                    {r.status}
-                  </span>
-                </td>
-                <td className="p-3">{r.files.length}</td>
-                <td className="p-3 text-zinc-500">
-                  {new Date(r.createdAt).toLocaleString()}
-                </td>
-                {canWrite && (
-                  <td className="p-3 w-24">
-                    <div
-                      className={`flex items-center gap-2 transition-opacity ${
-                        processing === r.id
-                          ? "opacity-100"
-                          : "opacity-0 group-hover:opacity-100"
-                      }`}
+                    <td className="px-4 py-3">
+                      <Link
+                        className="text-fg-strong tabular-nums underline-offset-4 transition-colors hover:text-accent hover:underline"
+                        href={`/runs/${r.id}`}
+                      >
+                        {r.businessDate}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-fg tabular-nums">
+                      {r.batchNo}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge
+                        tone={STATUS_TONE[r.status] ?? "neutral"}
+                        size="sm"
+                      >
+                        {r.status}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 tabular-nums text-fg-muted">
+                      {r.files.length}
+                    </td>
+                    <td className="px-4 py-3 text-fg-subtle tabular-nums">
+                      {new Date(r.createdAt).toLocaleString()}
+                    </td>
+                    {canWrite && (
+                      <td className="px-4 py-3 w-28">
+                        <div
+                          className={`flex items-center gap-1 transition-opacity ${
+                            processing === r.id
+                              ? "opacity-100"
+                              : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+                          }`}
+                        >
+                          {processing === r.id ? (
+                            <span className="text-[10px] uppercase tracking-wider text-fg-subtle animate-pulse">
+                              Working…
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                title="Rerun (uses stored raw data)"
+                                onClick={() => handleRerun(r.id)}
+                                className="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-info-soft hover:text-info-fg focus:outline-none focus:ring-2 focus:ring-accent/30"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="15"
+                                  height="15"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                                  <path d="M21 3v5h-5" />
+                                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                                  <path d="M3 21v-5h5" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                title="Delete run"
+                                onClick={() => handleDelete(r.id)}
+                                className="rounded-md p-1.5 text-fg-muted transition-colors hover:bg-danger-soft hover:text-danger-fg focus:outline-none focus:ring-2 focus:ring-accent/30"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="15"
+                                  height="15"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M3 6h18" />
+                                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                                </svg>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+                {!loading && runs.length === 0 ? (
+                  <tr>
+                    <td
+                      className="px-4 py-12"
+                      colSpan={canWrite ? 6 : 5}
                     >
-                      {processing === r.id ? (
-                        <span className="text-[10px] text-zinc-400 animate-pulse">
-                          Wait...
-                        </span>
-                      ) : (
-                        <>
-                          <button
-                            title="Rerun (uses stored raw data)"
-                            onClick={() => handleRerun(r.id)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                              <path d="M21 3v5h-5" />
-                              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-                              <path d="M3 21v-5h5" />
-                            </svg>
-                          </button>
-                          <button
-                            title="Delete Run"
-                            onClick={() => handleDelete(r.id)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M3 6h18" />
-                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                            </svg>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-            {!loading && runs.length === 0 ? (
-              <tr>
-                <td
-                  className="p-3 text-sm text-zinc-500"
-                  colSpan={canWrite ? 6 : 5}
-                >
-                  No runs yet.
-                </td>
-              </tr>
-            ) : null}
-            {loading ? (
-              <tr>
-                <td
-                  className="p-3 text-sm text-zinc-500"
-                  colSpan={canWrite ? 6 : 5}
-                >
-                  Loading...
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+                      <EmptyState
+                        title="No runs yet"
+                        description="Upload your first Tekion export to see runs here."
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+                {loading ? (
+                  <tr>
+                    <td
+                      className="px-4 py-6 text-center text-sm text-fg-subtle"
+                      colSpan={canWrite ? 6 : 5}
+                    >
+                      Loading…
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : null}
     </main>
   );
 }

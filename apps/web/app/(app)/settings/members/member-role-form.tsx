@@ -36,7 +36,7 @@ export function MemberRoleForm({
           const form = e.target.closest("form");
           if (form) form.requestSubmit();
         }}
-        className="rounded border border-zinc-200 bg-white px-2 py-1 text-xs focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 disabled:opacity-50"
+        className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-fg-strong shadow-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:opacity-50"
       >
         {MEMBERSHIP_ROLES.map((r) => (
           <option key={r} value={r}>
@@ -44,8 +44,14 @@ export function MemberRoleForm({
           </option>
         ))}
       </select>
-      {pending && <span className="text-[10px] text-zinc-400 animate-pulse">saving...</span>}
-      {state?.error && <span className="text-[10px] text-red-600">{state.error}</span>}
+      {pending && (
+        <span className="text-[10px] text-fg-subtle animate-pulse">
+          saving...
+        </span>
+      )}
+      {state?.error && (
+        <span className="text-[10px] text-danger">{state.error}</span>
+      )}
     </form>
   );
 }

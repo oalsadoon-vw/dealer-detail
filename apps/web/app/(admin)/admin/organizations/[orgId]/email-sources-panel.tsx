@@ -6,6 +6,16 @@ import {
   addEmailSourceAction,
   removeEmailSourceAction,
 } from "@/lib/server/actions/admin";
+import {
+  Button,
+  Card,
+  CardTitle,
+  CardDescription,
+  FormField,
+  Input,
+  Badge,
+  SectionHeading,
+} from "@/components/ui";
 
 type EmailSourceRow = {
   id: string;
@@ -67,138 +77,133 @@ export function EmailSourcesPanel({
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Email Sources ({sources.length})</h2>
-        {!adding && (
-          <button
-            type="button"
-            onClick={() => {
-              setAdding(true);
-              setError(null);
-            }}
-            className="rounded border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900 transition-colors"
-          >
-            Add Source
-          </button>
-        )}
-      </div>
-
-      <p className="text-xs text-zinc-500">
-        DMS email addresses the cron polls for this org&apos;s daily reports.
-        Attachments are routed to the right store via filename abbreviation
-        matching, scoped to this org&apos;s stores only.
-      </p>
-
-      {adding && (
-        <form
-          onSubmit={handleAdd}
-          className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 space-y-3"
-        >
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <label className="block space-y-1">
-              <span className="text-xs text-zinc-400">Sender email</span>
-              <input
-                name="senderEmail"
-                type="email"
-                required
-                disabled={pending}
-                className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:opacity-50"
-                placeholder="reportbuilder@tekion.com"
-              />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs text-zinc-400">
-                Subject pattern <span className="text-zinc-600">(optional)</span>
-              </span>
-              <input
-                name="subjectPattern"
-                disabled={pending}
-                className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:opacity-50"
-                placeholder="DAILY Report"
-              />
-            </label>
-          </div>
-
-          {error && (
-            <div className="rounded-md bg-red-900/40 border border-red-800 px-3 py-2 text-xs text-red-300">
-              {error}
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <button
-              type="submit"
-              disabled={pending}
-              className="rounded-md bg-white text-zinc-950 px-3 py-1.5 text-xs font-medium hover:bg-zinc-200 transition-colors disabled:opacity-50"
-            >
-              {pending ? "Adding..." : "Add source"}
-            </button>
-            <button
-              type="button"
+      <SectionHeading
+        title={`Email Sources (${sources.length})`}
+        description="DMS email addresses the cron polls for this org's daily reports. Attachments are routed to the right store via filename abbreviation matching, scoped to this org's stores only."
+        action={
+          !adding && (
+            <Button
+              size="sm"
               onClick={() => {
-                setAdding(false);
+                setAdding(true);
                 setError(null);
               }}
-              disabled={pending}
-              className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900 transition-colors disabled:opacity-50"
             >
-              Cancel
-            </button>
-          </div>
-        </form>
+              Add Source
+            </Button>
+          )
+        }
+      />
+
+      {adding && (
+        <Card>
+          <form onSubmit={handleAdd} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField label="Sender email" required>
+                <Input
+                  name="senderEmail"
+                  type="email"
+                  required
+                  disabled={pending}
+                  placeholder="reportbuilder@tekion.com"
+                />
+              </FormField>
+              <FormField label="Subject pattern" helper="Optional Gmail filter.">
+                <Input
+                  name="subjectPattern"
+                  disabled={pending}
+                  placeholder="DAILY Report"
+                />
+              </FormField>
+            </div>
+
+            {error && (
+              <div className="rounded-md bg-danger-soft border border-danger/20 px-3 py-2 text-xs text-danger">
+                {error}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                pending={pending}
+              >
+                {pending ? "Adding..." : "Add source"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setAdding(false);
+                  setError(null);
+                }}
+                disabled={pending}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Card>
       )}
 
       {sources.length > 0 ? (
-        <div className="rounded-lg border border-zinc-800 overflow-x-auto">
+        <div className="rounded-lg border border-line bg-surface overflow-x-auto">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="border-b border-zinc-800 bg-zinc-900/50">
-              <tr>
-                <th className="text-left p-3 text-zinc-400 font-medium">
+            <thead className="bg-surface-2/60 text-fg-subtle">
+              <tr className="border-b border-line">
+                <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
                   Sender
                 </th>
-                <th className="text-left p-3 text-zinc-400 font-medium">
+                <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
                   Subject pattern
                 </th>
-                <th className="text-left p-3 text-zinc-400 font-medium">Scope</th>
-                <th className="text-left p-3 text-zinc-400 font-medium">
+                <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                  Scope
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
                   Last processed
                 </th>
-                <th className="text-right p-3 text-zinc-400 font-medium">
+                <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-line-subtle">
               {sources.map((s) => (
                 <tr
                   key={s.id}
-                  className="border-b border-zinc-800/50 last:border-b-0"
+                  className="hover:bg-accent-soft/40 transition-colors"
                 >
-                  <td className="p-3 font-mono text-xs">{s.senderEmail}</td>
-                  <td className="p-3 text-zinc-400">
+                  <td className="px-4 py-3 font-mono text-xs text-fg-strong">
+                    {s.senderEmail}
+                  </td>
+                  <td className="px-4 py-3 text-fg-muted">
                     {s.subjectPattern ?? (
-                      <span className="text-zinc-600">— any —</span>
+                      <span className="text-fg-subtle italic">— any —</span>
                     )}
                   </td>
-                  <td className="p-3 text-zinc-400">
+                  <td className="px-4 py-3">
                     {s.storeId ? (
-                      <span title={s.storeName ?? undefined}>
+                      <Badge tone="neutral">
                         Store: {s.storeName ?? s.storeId}
-                      </span>
+                      </Badge>
                     ) : (
-                      <span className="text-emerald-400">Org-wide</span>
+                      <Badge tone="success">Org-wide</Badge>
                     )}
                   </td>
-                  <td className="p-3 text-zinc-500">
+                  <td className="px-4 py-3 text-fg-muted">
                     {s.lastProcessedAt
                       ? new Date(s.lastProcessedAt).toLocaleString()
                       : "Never"}
                   </td>
-                  <td className="p-3 text-right">
+                  <td className="px-4 py-3 text-right">
                     <button
                       type="button"
                       onClick={() => handleRemove(s.id, s.senderEmail)}
-                      className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                      className="text-xs font-medium text-danger hover:text-danger/80 transition-colors"
                     >
                       Remove
                     </button>
@@ -210,15 +215,17 @@ export function EmailSourcesPanel({
         </div>
       ) : (
         !adding && (
-          <p className="text-sm text-zinc-600">
-            No email sources configured. Reports will not be ingested until at
-            least one source is added.
-          </p>
+          <Card>
+            <CardTitle>No email sources configured</CardTitle>
+            <CardDescription>
+              Reports will not be ingested until at least one source is added.
+            </CardDescription>
+          </Card>
         )
       )}
 
       {error && !adding && (
-        <p className="text-xs text-red-400">{error}</p>
+        <p className="text-xs text-danger">{error}</p>
       )}
     </section>
   );

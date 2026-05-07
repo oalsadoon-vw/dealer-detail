@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import type { MembershipRole } from "@/lib/types/auth";
 import { BrandMark, BRAND_NAME } from "@/components/BrandMark";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 type NavItem = {
   href: string;
@@ -31,48 +32,92 @@ export type SidebarUser = {
 
 function IconUpload() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-      <path fill="currentColor" d="M12 3l4 4h-3v7h-2V7H8l4-4zm-7 14h14v2H5v-2z" />
-    </svg>
-  );
-}
-
-function IconStore() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-      <path fill="currentColor" d="M4 7l8-4 8 4v2H4V7zm2 4h3v8H6v-8zm5 0h2v8h-2v-8zm4 0h3v8h-3v-8zM4 21h16v-2H4v2z" />
+    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M12 3l4 4h-3v7h-2V7H8l4-4zm-7 14h14v2H5v-2z"
+      />
     </svg>
   );
 }
 
 function IconRuns() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-      <path fill="currentColor" d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h16v2H4v-2z" />
+    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h16v2H4v-2z"
+      />
     </svg>
   );
 }
 
 function IconDashboard() {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
-      <path fill="currentColor" d="M3 13h8v8H3v-8zm10-10h8v18h-8V3zM3 3h8v8H3V3z" />
+    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M3 13h8v8H3v-8zm10-10h8v18h-8V3zM3 3h8v8H3V3z"
+      />
+    </svg>
+  );
+}
+
+function IconSettings() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-[18px] w-[18px] shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+      />
     </svg>
   );
 }
 
 function IconSignOut() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+      />
     </svg>
   );
 }
 
 function IconChevronDown() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    <svg
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19 9l-7 7-7-7"
+      />
     </svg>
   );
 }
@@ -101,9 +146,6 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
 
   const isOrgAdmin = user?.role === "org_admin" || user?.isPlatformAdmin;
 
-  // The sidebar defaults to expanded. Only the user's stored manual toggle
-  // overrides that — we never auto-collapse based on viewport width, since
-  // the lg+ content area always has room for the 260px sidebar.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(COLLAPSED_STORAGE_KEY);
@@ -166,22 +208,23 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
   const initials = displayName.charAt(0).toUpperCase();
   const hasMultipleOrgs = (user?.orgs?.length ?? 0) > 1;
 
-  // Render the sidebar's contents at a given collapsed state. The desktop
-  // sticky sidebar uses the live `collapsed` state; the mobile drawer always
-  // passes `false` so labels are visible inside the 280px drawer panel.
+  // The desktop sidebar is always dark (graphite rail), regardless of the
+  // app's light/dark theme. This is a deliberate Linear-style choice — the
+  // sidebar reads as a stable navigation surface that doesn't shift visually
+  // when the user toggles the content theme.
   const renderSidebarContent = (isCollapsed: boolean) => (
     <aside
       className={cx(
-        "flex flex-col h-full border-r border-zinc-800 bg-zinc-950 text-white",
-        isCollapsed ? "w-[72px]" : "w-[260px]",
+        "flex flex-col h-full border-r border-zinc-800 bg-zinc-950 text-zinc-200",
+        isCollapsed ? "w-[64px]" : "w-[248px]",
         "transition-[width] duration-200 ease-out"
       )}
     >
       {/* Header — brand identity */}
       <div
         className={cx(
-          "flex h-16 items-center border-b border-zinc-900",
-          isCollapsed ? "justify-center px-2" : "justify-between gap-2 pl-4 pr-2"
+          "flex h-14 items-center border-b border-zinc-900",
+          isCollapsed ? "justify-center px-2" : "justify-between gap-2 pl-3 pr-2"
         )}
       >
         <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
@@ -190,11 +233,11 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
           </div>
           {!isCollapsed && (
             <div className="min-w-0">
-              <span className="font-semibold text-zinc-100 whitespace-nowrap block text-sm tracking-tight">
+              <span className="block text-sm font-semibold tracking-tight text-zinc-100 truncate">
                 {BRAND_NAME}
               </span>
               {user?.orgName && (
-                <span className="text-[10px] text-zinc-500 truncate block">
+                <span className="block text-[10px] text-zinc-500 truncate">
                   {user.orgName}
                 </span>
               )}
@@ -204,13 +247,23 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
         {!isCollapsed && (
           <button
             type="button"
-            className="hidden lg:flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:text-white hover:bg-zinc-900 transition-colors"
+            className="hidden lg:flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
             onClick={() => setCollapsed(true)}
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+              />
             </svg>
           </button>
         )}
@@ -221,13 +274,23 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
         <div className="hidden lg:flex justify-center border-b border-zinc-900 py-1.5">
           <button
             type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:text-white hover:bg-zinc-900 transition-colors"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-zinc-900 transition-colors"
             onClick={() => setCollapsed(false)}
             aria-label="Expand sidebar"
             title="Expand sidebar"
           >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M13 5l7 7-7 7M5 5l7 7-7 7"
+              />
             </svg>
           </button>
         </div>
@@ -239,7 +302,7 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
           <button
             onClick={() => setOrgDropdownOpen((v) => !v)}
             disabled={switching}
-            className="flex w-full items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900 transition-colors disabled:opacity-50"
+            className="flex w-full items-center justify-between gap-2 rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-900 hover:border-zinc-700 transition-colors disabled:opacity-50"
           >
             <span className="truncate">{user?.orgName ?? "Select org"}</span>
             <IconChevronDown />
@@ -265,9 +328,9 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
         </div>
       )}
 
-      <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1">
+      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
         {!isCollapsed && (
-          <div className="px-2 mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+          <div className="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
             Navigation
           </div>
         )}
@@ -279,22 +342,28 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
               key={item.href}
               href={item.href}
               className={cx(
-                "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "group relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
                 active
-                  ? "bg-zinc-900 text-white shadow-sm ring-1 ring-inset ring-zinc-800"
-                  : "text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200"
+                  ? "bg-zinc-900 text-white"
+                  : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-100"
               )}
               title={isCollapsed ? item.label : undefined}
             >
+              {/* Active marker — subtle accent bar on the left */}
+              {active && (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full bg-accent" />
+              )}
               <div
                 className={cx(
                   "shrink-0 transition-colors",
-                  active ? "text-white" : "text-zinc-500 group-hover:text-zinc-300"
+                  active
+                    ? "text-zinc-100"
+                    : "text-zinc-500 group-hover:text-zinc-300"
                 )}
               >
                 {item.icon}
               </div>
-              {!isCollapsed && <div>{item.label}</div>}
+              {!isCollapsed && <span>{item.label}</span>}
             </Link>
           );
         })}
@@ -302,42 +371,42 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
         {isOrgAdmin && (
           <>
             {!isCollapsed && (
-              <div className="px-2 mt-4 mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+              <div className="px-2 mt-4 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
                 Admin
               </div>
             )}
             <Link
               href="/settings"
               className={cx(
-                "group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "group relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
                 isActive("/settings")
-                  ? "bg-zinc-900 text-white shadow-sm ring-1 ring-inset ring-zinc-800"
-                  : "text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200"
+                  ? "bg-zinc-900 text-white"
+                  : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-100"
               )}
               title={isCollapsed ? "Settings" : undefined}
             >
-              <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              {!isCollapsed && <div>Settings</div>}
+              {isActive("/settings") && (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full bg-accent" />
+              )}
+              <IconSettings />
+              {!isCollapsed && <span>Settings</span>}
             </Link>
           </>
         )}
 
         {user?.isPlatformAdmin && !isCollapsed && (
           <>
-            <div className="px-2 mt-4 mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+            <div className="px-2 mt-4 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
               Platform
             </div>
             <Link
               href="/admin"
-              className="group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-red-400/80 hover:bg-red-950/30 hover:text-red-300 transition-colors"
+              className="group flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium text-rose-400/80 hover:bg-rose-950/40 hover:text-rose-300 transition-colors"
             >
-              <div className="h-5 w-5 rounded bg-red-900/50 text-red-400 grid place-items-center text-[10px] font-bold shrink-0">
+              <div className="h-[18px] w-[18px] grid place-items-center rounded bg-rose-900/50 text-rose-400 text-[9px] font-bold shrink-0">
                 SA
               </div>
-              <div>Admin Portal</div>
+              <span>Admin Portal</span>
             </Link>
           </>
         )}
@@ -345,9 +414,9 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
           <Link
             href="/admin"
             title="Admin Portal"
-            className="flex items-center justify-center mt-2"
+            className="mt-2 flex items-center justify-center"
           >
-            <div className="h-7 w-7 rounded bg-red-900/50 text-red-400 grid place-items-center text-[10px] font-bold hover:bg-red-900/70 transition-colors">
+            <div className="h-7 w-7 rounded-md bg-rose-900/50 text-rose-400 grid place-items-center text-[10px] font-bold hover:bg-rose-900/70 transition-colors">
               SA
             </div>
           </Link>
@@ -355,16 +424,18 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
       </nav>
 
       {/* User footer */}
-      <div className="p-4 border-t border-zinc-900">
+      <div className="p-3 border-t border-zinc-900 space-y-2">
         {!isCollapsed ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 shrink-0 rounded-full bg-zinc-800 grid place-items-center text-xs text-zinc-400 font-medium">
+          <>
+            <div className="flex items-center gap-2.5">
+              <div className="h-7 w-7 shrink-0 rounded-full bg-zinc-800 grid place-items-center text-[11px] font-medium text-zinc-300">
                 {initials}
               </div>
-              <div className="text-xs text-zinc-500 truncate min-w-0">
-                <div className="text-zinc-300 font-medium truncate">{displayName}</div>
-                <div className="truncate">
+              <div className="min-w-0 flex-1 text-xs">
+                <div className="font-medium text-zinc-200 truncate">
+                  {displayName}
+                </div>
+                <div className="truncate text-zinc-500">
                   {displayEmail}
                   {user?.role && (
                     <span className="ml-1 text-zinc-600">
@@ -374,24 +445,30 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
                 </div>
               </div>
             </div>
+            <div className="flex items-center justify-between gap-1">
+              <button
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 transition-colors disabled:opacity-50"
+              >
+                <IconSignOut />
+                {signingOut ? "Signing out..." : "Sign out"}
+              </button>
+              <ThemeToggle className="!text-zinc-500 hover:!text-zinc-100 hover:!bg-zinc-900" />
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <ThemeToggle className="!text-zinc-500 hover:!text-zinc-100 hover:!bg-zinc-900" />
             <button
               onClick={handleSignOut}
               disabled={signingOut}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900 transition-colors disabled:opacity-50"
+              title="Sign out"
+              className="grid h-7 w-7 place-items-center rounded-md bg-zinc-800 text-xs text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200 transition-colors disabled:opacity-50"
             >
               <IconSignOut />
-              {signingOut ? "Signing out..." : "Sign out"}
             </button>
           </div>
-        ) : (
-          <button
-            onClick={handleSignOut}
-            disabled={signingOut}
-            title="Sign out"
-            className="h-8 w-8 mx-auto rounded-full bg-zinc-800 grid place-items-center text-xs text-zinc-400 hover:text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-50"
-          >
-            <IconSignOut />
-          </button>
         )}
       </div>
     </aside>
@@ -400,21 +477,23 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
   return (
     <>
       {/* Mobile top bar (shown below lg) */}
-      <div className="lg:hidden flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4">
+      <div className="lg:hidden flex h-14 items-center justify-between border-b border-line bg-surface px-4">
         <div className="flex items-center gap-2 min-w-0">
           <BrandMark size="sm" variant="dark" />
           <div className="min-w-0">
-            <div className="font-semibold text-zinc-900 text-sm tracking-tight truncate">
+            <div className="font-semibold text-sm tracking-tight text-fg-strong truncate">
               {BRAND_NAME}
             </div>
             {user?.orgName && (
-              <div className="text-[10px] text-zinc-500 truncate">{user.orgName}</div>
+              <div className="text-[10px] text-fg-subtle truncate">
+                {user.orgName}
+              </div>
             )}
           </div>
         </div>
         <button
           type="button"
-          className="rounded border px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 shrink-0"
+          className="rounded-md border border-line px-3 py-1.5 text-sm text-fg-muted hover:bg-surface-2 shrink-0"
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation"
         >
@@ -422,20 +501,19 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
         </button>
       </div>
 
-      {/* Desktop sidebar (lg+) — uses the live collapsed state */}
+      {/* Desktop sidebar (lg+) */}
       <div className="hidden lg:block h-full sticky top-0 self-start max-h-screen overflow-hidden">
         {renderSidebarContent(collapsed)}
       </div>
 
-      {/* Mobile drawer (below lg) — always renders expanded; the 280px panel
-          has plenty of room for full nav labels. */}
+      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="absolute inset-0 bg-zinc-900/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 w-[280px] bg-zinc-950 shadow-xl">
+          <div className="absolute inset-y-0 left-0 w-[260px] bg-zinc-950 shadow-xl">
             {renderSidebarContent(false)}
           </div>
         </div>

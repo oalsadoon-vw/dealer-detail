@@ -15,7 +15,9 @@ export function MoveStoreControl({
   otherOrgs: OrgOption[];
 }) {
   const [open, setOpen] = useState(false);
-  const [targetOrgId, setTargetOrgId] = useState<string>(otherOrgs[0]?.id ?? "");
+  const [targetOrgId, setTargetOrgId] = useState<string>(
+    otherOrgs[0]?.id ?? ""
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +52,7 @@ export function MoveStoreControl({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+        className="text-xs font-medium text-fg-muted hover:text-fg-strong transition-colors"
       >
         Move
       </button>
@@ -67,7 +69,7 @@ export function MoveStoreControl({
         value={targetOrgId}
         onChange={(e) => setTargetOrgId(e.target.value)}
         disabled={pending}
-        className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:opacity-50"
+        className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-fg-strong shadow-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:opacity-50"
       >
         {otherOrgs.map((o) => (
           <option key={o.id} value={o.id}>
@@ -78,7 +80,7 @@ export function MoveStoreControl({
       <button
         type="submit"
         disabled={pending}
-        className="rounded bg-white px-2 py-1 text-[11px] font-medium text-zinc-950 hover:bg-zinc-200 transition-colors disabled:opacity-50"
+        className="rounded-md bg-accent text-accent-fg px-2 py-1 text-[11px] font-semibold hover:bg-accent-strong transition-colors disabled:opacity-50"
       >
         {pending ? "Moving..." : "Move"}
       </button>
@@ -89,12 +91,12 @@ export function MoveStoreControl({
           setError(null);
         }}
         disabled={pending}
-        className="text-[11px] text-zinc-500 hover:text-zinc-300 disabled:opacity-50"
+        className="text-[11px] text-fg-muted hover:text-fg-strong disabled:opacity-50"
       >
         Cancel
       </button>
       {error && (
-        <span className="text-[10px] text-red-400 ml-2">{error}</span>
+        <span className="ml-2 text-[10px] text-danger">{error}</span>
       )}
     </form>
   );

@@ -1,26 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import {
+  Badge,
+  Card,
+  CardTitle,
+  LinkButton,
+  SectionHeading,
+} from "@/components/ui";
 import { MoveStoreControl } from "./move-store-control";
 import { DeleteStoreButton } from "./delete-store-button";
 import { DeleteOrganizationButton } from "./delete-organization-button";
 import { EmailSourcesPanel } from "./email-sources-panel";
 
 export const dynamic = "force-dynamic";
-
-function Badge({ children, variant = "default" }: { children: React.ReactNode; variant?: "default" | "green" | "yellow" | "red" }) {
-  const colors = {
-    default: "bg-zinc-800 text-zinc-300",
-    green: "bg-emerald-900/60 text-emerald-300 border-emerald-800",
-    yellow: "bg-yellow-900/60 text-yellow-300 border-yellow-800",
-    red: "bg-red-900/60 text-red-300 border-red-800",
-  };
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase border ${colors[variant]}`}>
-      {children}
-    </span>
-  );
-}
 
 export default async function OrgDetailPage({
   params,
@@ -32,51 +25,58 @@ export default async function OrgDetailPage({
   });
   if (!org) notFound();
 
-  const [stores, members, invites, otherOrgs, emailSourcesRaw] = await Promise.all([
-    prisma.store.findMany({
-      where: { organizationId: org.id },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, abbreviation: true, timezone: true, createdAt: true },
-    }),
-    prisma.membership.findMany({
-      where: { organizationId: org.id },
-      include: {
-        profile: { select: { email: true, fullName: true } },
-      },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.invite.findMany({
-      where: { organizationId: org.id },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-        expiresAt: true,
-        acceptedAt: true,
-        createdAt: true,
-        invitedBy: { select: { email: true } },
-      },
-    }),
-    prisma.organization.findMany({
-      where: { id: { not: org.id } },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-    }),
-    prisma.emailSource.findMany({
-      where: { organizationId: org.id },
-      orderBy: [{ storeId: "asc" }, { senderEmail: "asc" }],
-      select: {
-        id: true,
-        senderEmail: true,
-        subjectPattern: true,
-        isActive: true,
-        lastProcessedAt: true,
-        storeId: true,
-        store: { select: { name: true } },
-      },
-    }),
-  ]);
+  const [stores, members, invites, otherOrgs, emailSourcesRaw] =
+    await Promise.all([
+      prisma.store.findMany({
+        where: { organizationId: org.id },
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          abbreviation: true,
+          timezone: true,
+          createdAt: true,
+        },
+      }),
+      prisma.membership.findMany({
+        where: { organizationId: org.id },
+        include: {
+          profile: { select: { email: true, fullName: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      }),
+      prisma.invite.findMany({
+        where: { organizationId: org.id },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          expiresAt: true,
+          acceptedAt: true,
+          createdAt: true,
+          invitedBy: { select: { email: true } },
+        },
+      }),
+      prisma.organization.findMany({
+        where: { id: { not: org.id } },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      }),
+      prisma.emailSource.findMany({
+        where: { organizationId: org.id },
+        orderBy: [{ storeId: "asc" }, { senderEmail: "asc" }],
+        select: {
+          id: true,
+          senderEmail: true,
+          subjectPattern: true,
+          isActive: true,
+          lastProcessedAt: true,
+          storeId: true,
+          store: { select: { name: true } },
+        },
+      }),
+    ]);
 
   const emailSources = emailSourcesRaw.map((s) => ({
     id: s.id,
@@ -90,108 +90,137 @@ export default async function OrgDetailPage({
 
   const hasOrgAdmin = members.some((m) => m.role === "org_admin");
   const hasEmailSource = emailSources.some((s) => s.isActive);
-  const pendingInvites = invites.filter((i) => !i.acceptedAt && i.expiresAt > new Date());
-  const acceptedInvites = invites.filter((i) => i.acceptedAt);
-  const expiredInvites = invites.filter((i) => !i.acceptedAt && i.expiresAt <= new Date());
 
-  const onboardingComplete = hasOrgAdmin && stores.length > 0 && hasEmailSource;
+  const onboardingComplete =
+    hasOrgAdmin && stores.length > 0 && hasEmailSource;
 
   return (
     <div className="fade-in-up space-y-8 min-w-0">
       {/* Header */}
       <div className="min-w-0">
-        <Link href="/admin/organizations" className="text-xs text-zinc-500 hover:text-zinc-300">
-          &larr; Organizations
+        <Link
+          href="/admin/organizations"
+          className="inline-flex items-center text-xs text-fg-muted hover:text-fg-strong transition-colors"
+        >
+          ← Organizations
         </Link>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 min-w-0">
-          <h1 className="text-2xl font-bold truncate">{org.name}</h1>
-          <span className="font-mono text-sm text-zinc-500 truncate">{org.slug}</span>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-fg-strong truncate">
+            {org.name}
+          </h1>
+          <span className="font-mono text-sm text-fg-muted truncate">
+            {org.slug}
+          </span>
         </div>
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {onboardingComplete ? (
-            <Badge variant="green">Onboarded</Badge>
+            <Badge tone="success" dot>
+              Onboarded
+            </Badge>
           ) : (
-            <Badge variant="yellow">Setup Incomplete</Badge>
+            <Badge tone="warning" dot>
+              Setup Incomplete
+            </Badge>
           )}
-          {!hasOrgAdmin && <Badge variant="red">No Org Admin</Badge>}
-          {stores.length === 0 && <Badge variant="red">No Stores</Badge>}
-          {!hasEmailSource && <Badge variant="red">No Email Source</Badge>}
+          {!hasOrgAdmin && <Badge tone="danger">No Org Admin</Badge>}
+          {stores.length === 0 && <Badge tone="danger">No Stores</Badge>}
+          {!hasEmailSource && <Badge tone="danger">No Email Source</Badge>}
         </div>
       </div>
 
       {/* Onboarding checklist */}
       {!onboardingComplete && (
-        <div className="rounded-lg border border-yellow-800/50 bg-yellow-950/20 p-4 space-y-2">
-          <h2 className="text-sm font-medium text-yellow-300">Onboarding Checklist</h2>
-          <ul className="space-y-1 text-sm">
-            <li className="flex items-center gap-2">
-              <span className={stores.length > 0 ? "text-emerald-400" : "text-zinc-600"}>{stores.length > 0 ? "✓" : "○"}</span>
-              <span className={stores.length > 0 ? "text-zinc-300" : "text-zinc-400"}>
-                Create at least one store
-              </span>
-              {stores.length === 0 && (
-                <Link href={`/admin/organizations/${org.id}/stores/new`} className="text-xs text-yellow-400 underline ml-auto">
-                  Create store
-                </Link>
-              )}
-            </li>
-            <li className="flex items-center gap-2">
-              <span className={hasOrgAdmin ? "text-emerald-400" : "text-zinc-600"}>{hasOrgAdmin ? "✓" : "○"}</span>
-              <span className={hasOrgAdmin ? "text-zinc-300" : "text-zinc-400"}>
-                Invite an organization admin
-              </span>
-              {!hasOrgAdmin && (
-                <Link href={`/admin/organizations/${org.id}/invites/new`} className="text-xs text-yellow-400 underline ml-auto">
-                  Send invite
-                </Link>
-              )}
-            </li>
-            <li className="flex items-center gap-2">
-              <span className={hasEmailSource ? "text-emerald-400" : "text-zinc-600"}>{hasEmailSource ? "✓" : "○"}</span>
-              <span className={hasEmailSource ? "text-zinc-300" : "text-zinc-400"}>
-                Configure at least one email source
-              </span>
-              {!hasEmailSource && (
-                <span className="text-xs text-yellow-400 ml-auto">
-                  Use the &quot;Email Sources&quot; section below
-                </span>
-              )}
-            </li>
+        <Card variant="default" className="border-warning/30 bg-warning-soft/40">
+          <CardTitle className="text-warning">Onboarding Checklist</CardTitle>
+          <ul className="mt-3 space-y-2 text-sm">
+            <ChecklistItem
+              done={stores.length > 0}
+              label="Create at least one store"
+              actionHref={
+                stores.length === 0
+                  ? `/admin/organizations/${org.id}/stores/new`
+                  : undefined
+              }
+              actionLabel="Create store"
+            />
+            <ChecklistItem
+              done={hasOrgAdmin}
+              label="Invite an organization admin"
+              actionHref={
+                !hasOrgAdmin
+                  ? `/admin/organizations/${org.id}/invites/new`
+                  : undefined
+              }
+              actionLabel="Send invite"
+            />
+            <ChecklistItem
+              done={hasEmailSource}
+              label="Configure at least one email source"
+              actionLabel={
+                hasEmailSource
+                  ? undefined
+                  : "Use the Email Sources section below"
+              }
+            />
           </ul>
-        </div>
+        </Card>
       )}
 
       {/* Stores section */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Stores ({stores.length})</h2>
-          <Link
-            href={`/admin/organizations/${org.id}/stores/new`}
-            className="rounded border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900 transition-colors"
-          >
-            Add Store
-          </Link>
-        </div>
+        <SectionHeading
+          title={`Stores (${stores.length})`}
+          action={
+            <LinkButton
+              href={`/admin/organizations/${org.id}/stores/new`}
+              variant="secondary"
+              size="sm"
+            >
+              Add Store
+            </LinkButton>
+          }
+        />
         {stores.length > 0 ? (
-          <div className="rounded-lg border border-zinc-800 overflow-x-auto">
+          <div className="rounded-lg border border-line bg-surface overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
-              <thead className="border-b border-zinc-800 bg-zinc-900/50">
-                <tr>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Name</th>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Abbreviation</th>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Timezone</th>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Created</th>
-                  <th className="text-right p-3 text-zinc-400 font-medium">Actions</th>
+              <thead className="bg-surface-2/60 text-fg-subtle">
+                <tr className="border-b border-line">
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Abbreviation
+                  </th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Timezone
+                  </th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Created
+                  </th>
+                  <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-line-subtle">
                 {stores.map((s) => (
-                  <tr key={s.id} className="border-b border-zinc-800/50 last:border-b-0">
-                    <td className="p-3 font-medium">{s.name}</td>
-                    <td className="p-3 font-mono text-zinc-500">{s.abbreviation ?? "—"}</td>
-                    <td className="p-3 text-zinc-500">{s.timezone ?? "—"}</td>
-                    <td className="p-3 text-zinc-500">{s.createdAt.toLocaleDateString()}</td>
-                    <td className="p-3">
+                  <tr
+                    key={s.id}
+                    className="hover:bg-accent-soft/40 transition-colors"
+                  >
+                    <td className="px-4 py-3 font-medium text-fg-strong">
+                      {s.name}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-fg-muted">
+                      {s.abbreviation ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {s.timezone ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {s.createdAt.toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-3">
                         <MoveStoreControl
                           storeId={s.id}
@@ -207,87 +236,132 @@ export default async function OrgDetailPage({
             </table>
           </div>
         ) : (
-          <p className="text-sm text-zinc-600">No stores yet.</p>
+          <p className="text-sm text-fg-subtle">No stores yet.</p>
         )}
       </section>
 
       {/* Email sources */}
       <EmailSourcesPanel orgId={org.id} sources={emailSources} />
 
-      {/* Members section */}
+      {/* Members */}
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Members ({members.length})</h2>
+        <SectionHeading title={`Members (${members.length})`} />
         {members.length > 0 ? (
-          <div className="rounded-lg border border-zinc-800 overflow-x-auto">
+          <div className="rounded-lg border border-line bg-surface overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
-              <thead className="border-b border-zinc-800 bg-zinc-900/50">
-                <tr>
-                  <th className="text-left p-3 text-zinc-400 font-medium">User</th>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Email</th>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Role</th>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Joined</th>
+              <thead className="bg-surface-2/60 text-fg-subtle">
+                <tr className="border-b border-line">
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Role
+                  </th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Joined
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-line-subtle">
                 {members.map((m) => (
-                  <tr key={m.id} className="border-b border-zinc-800/50 last:border-b-0">
-                    <td className="p-3 font-medium">{m.profile.fullName ?? "—"}</td>
-                    <td className="p-3 text-zinc-400">{m.profile.email}</td>
-                    <td className="p-3">
-                      <Badge variant={m.role === "org_admin" ? "green" : "default"}>{m.role}</Badge>
+                  <tr
+                    key={m.id}
+                    className="hover:bg-accent-soft/40 transition-colors"
+                  >
+                    <td className="px-4 py-3 font-medium text-fg-strong">
+                      {m.profile.fullName ?? "—"}
                     </td>
-                    <td className="p-3 text-zinc-500">{m.createdAt.toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-fg-muted">{m.profile.email}</td>
+                    <td className="px-4 py-3">
+                      <Badge
+                        tone={m.role === "org_admin" ? "success" : "neutral"}
+                      >
+                        {m.role.replace(/_/g, " ")}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-fg-muted">
+                      {m.createdAt.toLocaleDateString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <p className="text-sm text-zinc-600">No members yet. Invite an org admin to get started.</p>
+          <p className="text-sm text-fg-subtle">
+            No members yet. Invite an org admin to get started.
+          </p>
         )}
       </section>
 
-      {/* Invites section */}
+      {/* Invites */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Invites ({invites.length})</h2>
-          <Link
-            href={`/admin/organizations/${org.id}/invites/new`}
-            className="rounded border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-900 transition-colors"
-          >
-            Send Invite
-          </Link>
-        </div>
+        <SectionHeading
+          title={`Invites (${invites.length})`}
+          action={
+            <LinkButton
+              href={`/admin/organizations/${org.id}/invites/new`}
+              variant="secondary"
+              size="sm"
+            >
+              Send Invite
+            </LinkButton>
+          }
+        />
         {invites.length > 0 ? (
-          <div className="rounded-lg border border-zinc-800 overflow-x-auto">
+          <div className="rounded-lg border border-line bg-surface overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
-              <thead className="border-b border-zinc-800 bg-zinc-900/50">
-                <tr>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Email</th>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Role</th>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Status</th>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Sent by</th>
-                  <th className="text-left p-3 text-zinc-400 font-medium">Created</th>
+              <thead className="bg-surface-2/60 text-fg-subtle">
+                <tr className="border-b border-line">
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Role
+                  </th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Sent by
+                  </th>
+                  <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                    Created
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-line-subtle">
                 {invites.map((inv) => {
-                  const isPending = !inv.acceptedAt && inv.expiresAt > new Date();
+                  const isPending =
+                    !inv.acceptedAt && inv.expiresAt > new Date();
                   const isAccepted = !!inv.acceptedAt;
-                  const isExpired = !inv.acceptedAt && inv.expiresAt <= new Date();
+                  const isExpired =
+                    !inv.acceptedAt && inv.expiresAt <= new Date();
                   return (
-                    <tr key={inv.id} className="border-b border-zinc-800/50 last:border-b-0">
-                      <td className="p-3">{inv.email}</td>
-                      <td className="p-3">
-                        <Badge>{inv.role}</Badge>
+                    <tr
+                      key={inv.id}
+                      className="hover:bg-accent-soft/40 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-fg-strong">{inv.email}</td>
+                      <td className="px-4 py-3">
+                        <Badge tone="neutral">
+                          {inv.role.replace(/_/g, " ")}
+                        </Badge>
                       </td>
-                      <td className="p-3">
-                        {isAccepted && <Badge variant="green">Accepted</Badge>}
-                        {isPending && <Badge variant="yellow">Pending</Badge>}
-                        {isExpired && <Badge variant="red">Expired</Badge>}
+                      <td className="px-4 py-3">
+                        {isAccepted && <Badge tone="success">Accepted</Badge>}
+                        {isPending && <Badge tone="warning">Pending</Badge>}
+                        {isExpired && <Badge tone="danger">Expired</Badge>}
                       </td>
-                      <td className="p-3 text-zinc-500">{inv.invitedBy.email}</td>
-                      <td className="p-3 text-zinc-500">{inv.createdAt.toLocaleDateString()}</td>
+                      <td className="px-4 py-3 text-fg-muted">
+                        {inv.invitedBy.email}
+                      </td>
+                      <td className="px-4 py-3 text-fg-muted">
+                        {inv.createdAt.toLocaleDateString()}
+                      </td>
                     </tr>
                   );
                 })}
@@ -295,26 +369,63 @@ export default async function OrgDetailPage({
             </table>
           </div>
         ) : (
-          <p className="text-sm text-zinc-600">No invites sent yet.</p>
+          <p className="text-sm text-fg-subtle">No invites sent yet.</p>
         )}
       </section>
 
       {/* Danger zone */}
-      <section className="space-y-3 rounded-lg border border-red-900/40 bg-red-950/10 p-5">
-        <div>
-          <h2 className="text-sm font-semibold text-red-300">Danger zone</h2>
-          <p className="mt-1 text-xs text-zinc-500">
-            Deleting an organization removes its memberships and invites. Stores
-            must be moved or deleted first.
-          </p>
+      <Card className="border-danger/30 bg-danger-soft/30">
+        <CardTitle className="text-danger">Danger zone</CardTitle>
+        <p className="mt-1 text-xs text-fg-muted">
+          Deleting an organization removes its memberships and invites. Stores
+          must be moved or deleted first.
+        </p>
+        <div className="mt-4">
+          <DeleteOrganizationButton
+            orgId={org.id}
+            orgName={org.name}
+            orgSlug={org.slug}
+            storeCount={stores.length}
+          />
         </div>
-        <DeleteOrganizationButton
-          orgId={org.id}
-          orgName={org.name}
-          orgSlug={org.slug}
-          storeCount={stores.length}
-        />
-      </section>
+      </Card>
     </div>
+  );
+}
+
+function ChecklistItem({
+  done,
+  label,
+  actionHref,
+  actionLabel,
+}: {
+  done: boolean;
+  label: string;
+  actionHref?: string;
+  actionLabel?: string;
+}) {
+  return (
+    <li className="flex items-center gap-2">
+      <span
+        className={
+          done
+            ? "h-5 w-5 grid place-items-center rounded-full bg-success text-white text-[11px] font-bold"
+            : "h-5 w-5 grid place-items-center rounded-full bg-surface-2 text-fg-subtle text-[11px] border border-line"
+        }
+      >
+        {done ? "✓" : "○"}
+      </span>
+      <span className={done ? "text-fg" : "text-fg-muted"}>{label}</span>
+      {actionHref ? (
+        <Link
+          href={actionHref}
+          className="ml-auto text-xs font-medium text-warning hover:text-warning/80 transition-colors"
+        >
+          {actionLabel} →
+        </Link>
+      ) : actionLabel ? (
+        <span className="ml-auto text-xs text-warning">{actionLabel}</span>
+      ) : null}
+    </li>
   );
 }

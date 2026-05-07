@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { resolveSessionUser } from "@/lib/server/tenant-context";
 import Link from "next/link";
+import { LinkButton, ThemeToggle } from "@/components/ui";
 
 export default async function AdminLayout({
   children,
@@ -17,37 +18,47 @@ export default async function AdminLayout({
   if (!user.isPlatformAdmin) redirect("/dashboard");
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      <header className="border-b border-zinc-800">
+    <div className="min-h-screen bg-canvas text-fg">
+      <header className="border-b border-line bg-surface/80 backdrop-blur-md sticky top-0 z-40">
         <div className="mx-auto max-w-6xl flex flex-wrap items-center justify-between gap-y-2 px-4 sm:px-6 py-2 sm:h-14 min-w-0">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <Link href="/admin" className="flex items-center gap-2 min-w-0">
-              <div className="h-7 w-7 shrink-0 rounded bg-red-600 text-white grid place-items-center text-xs font-bold">
+          <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+            <Link
+              href="/admin"
+              className="flex items-center gap-2 min-w-0 group"
+            >
+              <div className="h-7 w-7 shrink-0 rounded-md bg-danger text-white grid place-items-center text-[10px] font-bold tracking-wider shadow-sm group-hover:scale-105 transition-transform">
                 SA
               </div>
-              <span className="font-semibold text-sm truncate">Platform Admin</span>
+              <span className="font-semibold text-sm text-fg-strong tracking-tight truncate">
+                Platform Admin
+              </span>
             </Link>
-            <nav className="flex items-center gap-1 sm:ml-4">
+            <nav className="flex items-center gap-1 text-sm">
               <Link
                 href="/admin/organizations"
-                className="rounded px-3 py-1.5 text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors whitespace-nowrap"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-fg-muted hover:text-fg-strong hover:bg-surface-2 transition-colors whitespace-nowrap"
               >
                 Organizations
               </Link>
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm min-w-0">
-            <span className="hidden sm:inline text-zinc-500 truncate max-w-[200px]" title={user.email}>{user.email}</span>
-            <Link
-              href="/dashboard"
-              className="rounded border border-zinc-700 px-3 py-1 text-xs text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors whitespace-nowrap"
+            <span
+              className="hidden sm:inline text-fg-subtle truncate max-w-[200px]"
+              title={user.email}
             >
+              {user.email}
+            </span>
+            <ThemeToggle />
+            <LinkButton href="/dashboard" variant="secondary" size="sm">
               Back to app
-            </Link>
+            </LinkButton>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8 min-w-0">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8 min-w-0">
+        {children}
+      </main>
     </div>
   );
 }

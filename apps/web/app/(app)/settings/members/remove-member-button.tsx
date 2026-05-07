@@ -30,12 +30,12 @@ export function RemoveMemberButton({
         type="button"
         onClick={handleClick}
         disabled={pending}
-        className="text-xs text-red-600 hover:text-red-800 underline disabled:opacity-50"
+        className="text-xs font-medium text-danger hover:text-danger/80 transition-colors disabled:opacity-50"
       >
         {pending ? "Removing..." : "Remove"}
       </button>
       {state?.error && (
-        <div className="text-[10px] text-red-600 mt-1">{state.error}</div>
+        <div className="text-[10px] text-danger mt-1">{state.error}</div>
       )}
     </div>
   );

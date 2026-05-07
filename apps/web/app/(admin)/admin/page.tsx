@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { BRAND_NAME } from "@/components/BrandMark";
+import {
+  Card,
+  Stat,
+  LinkButton,
+  SectionHeading,
+} from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -15,56 +21,65 @@ export default async function AdminDashboard() {
       }),
     ]);
 
-  const stats = [
-    { label: "Organizations", value: orgCount, href: "/admin/organizations" },
-    { label: "Total Stores", value: storeCount },
-    { label: "Registered Users", value: profileCount },
-    { label: "Pending Invites", value: pendingInviteCount },
-  ];
-
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold">Platform Admin</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Internal management console for {BRAND_NAME}.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {stats.map((s) => (
-          <div
-            key={s.label}
-            className="rounded-lg border border-zinc-800 bg-zinc-900 p-4"
-          >
-            <div className="text-2xl font-bold">{s.value}</div>
-            <div className="mt-1 text-xs text-zinc-500">{s.label}</div>
-            {s.href && (
-              <Link
-                href={s.href}
-                className="mt-2 inline-block text-xs text-zinc-400 underline hover:text-white"
-              >
-                View all
-              </Link>
-            )}
+    <div className="space-y-8 fade-in-up min-w-0">
+      <SectionHeading
+        title="Platform Admin"
+        description={`Internal management console for ${BRAND_NAME}.`}
+        size="page"
+        action={
+          <div className="flex gap-2">
+            <LinkButton href="/admin/organizations/new" variant="primary">
+              Create Organization
+            </LinkButton>
+            <LinkButton href="/admin/organizations" variant="secondary">
+              View Organizations
+            </LinkButton>
           </div>
-        ))}
+        }
+      />
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Stat label="Organizations" value={String(orgCount)} />
+        <Stat label="Total Stores" value={String(storeCount)} />
+        <Stat label="Registered Users" value={String(profileCount)} />
+        <Stat
+          label="Pending Invites"
+          value={String(pendingInviteCount)}
+          tone={pendingInviteCount > 0 ? "warning" : "neutral"}
+        />
       </div>
 
-      <div className="flex gap-3">
-        <Link
-          href="/admin/organizations/new"
-          className="rounded-md bg-white text-zinc-950 px-4 py-2 text-sm font-medium hover:bg-zinc-200 transition-colors"
-        >
-          Create Organization
-        </Link>
-        <Link
-          href="/admin/organizations"
-          className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-900 transition-colors"
-        >
-          View Organizations
-        </Link>
-      </div>
+      <Card>
+        <h2 className="text-sm font-semibold text-fg-strong">Quick links</h2>
+        <p className="mt-1 text-xs text-fg-muted">
+          Jump to common admin actions.
+        </p>
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Link
+            href="/admin/organizations"
+            className="rounded-md border border-line bg-surface px-4 py-3 hover:bg-surface-2 transition-colors group"
+          >
+            <div className="text-sm font-medium text-fg-strong">
+              Manage Organizations
+            </div>
+            <div className="mt-0.5 text-xs text-fg-muted">
+              Browse, create, and manage all customer organizations.
+            </div>
+          </Link>
+          <Link
+            href="/admin/organizations/new"
+            className="rounded-md border border-line bg-surface px-4 py-3 hover:bg-surface-2 transition-colors group"
+          >
+            <div className="text-sm font-medium text-fg-strong">
+              Onboard New Customer
+            </div>
+            <div className="mt-0.5 text-xs text-fg-muted">
+              Create an organization with optional email source.
+            </div>
+          </Link>
+        </div>
+      </Card>
     </div>
   );
 }

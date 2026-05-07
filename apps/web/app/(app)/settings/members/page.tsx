@@ -2,10 +2,11 @@ import Link from "next/link";
 import { resolveTenantContext } from "@/lib/server/tenant-context";
 import { requireOrgAdmin } from "@/lib/server/authz";
 import { prisma } from "@/lib/db";
+import { Badge, LinkButton, SectionHeading } from "@/components/ui";
 import { MemberRoleForm } from "./member-role-form";
+import { RemoveMemberButton } from "./remove-member-button";
 
 export const dynamic = "force-dynamic";
-import { RemoveMemberButton } from "./remove-member-button";
 
 export default async function MembersPage() {
   const tc = await resolveTenantContext();
@@ -23,76 +24,111 @@ export default async function MembersPage() {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-zinc-500">{members.length} members</p>
-        <Link
-          href="/settings/invites"
-          className="rounded-md bg-zinc-900 text-white px-4 py-2 text-sm font-medium hover:bg-zinc-800 transition-colors"
-        >
-          Invite user
-        </Link>
-      </div>
+    <div className="space-y-6">
+      <SectionHeading
+        title="Members"
+        description={`${members.length} ${
+          members.length === 1 ? "member" : "members"
+        } in this organization.`}
+        action={
+          <LinkButton variant="primary" href="/settings/invites">
+            Invite user
+          </LinkButton>
+        }
+      />
 
-      <div className="rounded-lg border bg-white overflow-x-auto">
+      <div className="rounded-lg border border-line bg-surface overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
-          <thead className="border-b bg-zinc-50 text-left">
-            <tr>
-              <th className="p-3 font-medium text-zinc-500">User</th>
-              <th className="p-3 font-medium text-zinc-500">Role</th>
-              <th className="p-3 font-medium text-zinc-500">Stores</th>
-              <th className="p-3 font-medium text-zinc-500 w-20"></th>
+          <thead className="bg-surface-2/60 text-fg-subtle">
+            <tr className="border-b border-line">
+              <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-4 py-3">
+                User
+              </th>
+              <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-4 py-3">
+                Role
+              </th>
+              <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-4 py-3">
+                Stores
+              </th>
+              <th className="w-20 px-4 py-3" />
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-line-subtle">
             {members.map((m) => {
               const isSelf = m.profileId === tc.user.profileId;
-              const storeNames = m.storeMemberships.map((sm) => sm.store.name);
+              const storeNames = m.storeMemberships.map(
+                (sm) => sm.store.name
+              );
 
               return (
-                <tr key={m.id} className="border-b last:border-b-0">
-                  <td className="p-3">
-                    <div className="font-medium">{m.profile.fullName ?? m.profile.email}</div>
-                    <div className="text-xs text-zinc-500">{m.profile.email}</div>
+                <tr
+                  key={m.id}
+                  className="hover:bg-accent-soft/40 transition-colors"
+                >
+                  <td className="px-4 py-3 align-top">
+                    <div className="font-medium text-fg-strong">
+                      {m.profile.fullName ?? m.profile.email}
+                    </div>
+                    <div className="text-xs text-fg-subtle">
+                      {m.profile.email}
+                    </div>
                   </td>
-                  <td className="p-3">
+                  <td className="px-4 py-3 align-top">
                     {isSelf ? (
-                      <span className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700">
-                        {m.role} (you)
-                      </span>
+                      <Badge tone="accent">{m.role.replace(/_/g, " ")} (you)</Badge>
                     ) : (
-                      <MemberRoleForm membershipId={m.id} currentRole={m.role} />
+                      <MemberRoleForm
+                        membershipId={m.id}
+                        currentRole={m.role}
+                      />
                     )}
                   </td>
-                  <td className="p-3">
+                  <td className="px-4 py-3 align-top">
                     {m.role === "org_admin" ? (
-                      <span className="text-xs text-zinc-400">All stores</span>
+                      <span className="text-xs text-fg-subtle">All stores</span>
                     ) : storeNames.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {storeNames.map((name) => (
-                          <span key={name} className="inline-flex rounded bg-zinc-100 px-2 py-0.5 text-xs">
+                          <Badge key={name} tone="neutral" size="md">
                             {name}
-                          </span>
+                          </Badge>
                         ))}
                       </div>
                     ) : (
-                      <span className="text-xs text-zinc-400">None assigned</span>
+                      <span className="text-xs text-fg-subtle">
+                        None assigned
+                      </span>
                     )}
                     {!isSelf && m.role !== "org_admin" && (
                       <Link
                         href={`/settings/members/${m.id}`}
-                        className="mt-1 inline-block text-xs text-zinc-500 underline hover:text-zinc-700"
+                        className="mt-1.5 inline-block text-xs text-accent hover:text-accent-strong transition-colors"
                       >
-                        Manage stores
+                        Manage stores →
                       </Link>
                     )}
                   </td>
-                  <td className="p-3">
-                    {!isSelf && <RemoveMemberButton membershipId={m.id} name={m.profile.fullName ?? m.profile.email} />}
+                  <td className="px-4 py-3 align-top">
+                    {!isSelf && (
+                      <RemoveMemberButton
+                        membershipId={m.id}
+                        name={m.profile.fullName ?? m.profile.email}
+                      />
+                    )}
                   </td>
                 </tr>
               );
             })}
+            {members.length === 0 && (
+              <tr>
+                <td
+                  colSpan={4}
+                  className="px-4 py-12 text-center text-sm text-fg-subtle"
+                >
+                  No members yet — invite a user to get started.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

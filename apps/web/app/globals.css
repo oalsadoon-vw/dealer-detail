@@ -2,42 +2,176 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ----------------------------------------------------------------------------
+ * Design tokens (Linear/Arc-inspired)
+ *
+ * Colors are stored as bare R G B triplets so Tailwind's `<alpha-value>`
+ * substitution works (e.g. `bg-accent/10`, `text-fg-muted/80`). Surfaces,
+ * borders, text, and semantic accents map to the same token names in light
+ * and dark, so every primitive can stay theme-agnostic.
+ * ---------------------------------------------------------------------------- */
+
+:root {
+  /* Surfaces */
+  --canvas: 250 250 250;
+  --surface: 255 255 255;
+  --surface-2: 250 250 251;
+  --surface-3: 255 255 255;
+
+  /* Borders */
+  --border: 228 228 231;
+  --border-subtle: 244 244 246;
+  --border-strong: 212 212 216;
+
+  /* Text */
+  --text: 24 24 27;
+  --text-strong: 9 9 11;
+  --text-muted: 82 82 91;
+  --text-subtle: 113 113 122;
+
+  /* Accent (indigo) */
+  --accent: 99 102 241;
+  --accent-strong: 79 70 229;
+  --accent-soft: 238 242 255;
+  --accent-fg: 255 255 255;
+
+  /* Semantic */
+  --success: 16 185 129;
+  --success-soft: 236 253 245;
+  --success-fg: 4 120 87;
+
+  --danger: 244 63 94;
+  --danger-soft: 255 241 242;
+  --danger-fg: 159 18 57;
+
+  --warning: 245 158 11;
+  --warning-soft: 255 251 235;
+  --warning-fg: 146 64 14;
+
+  --info: 14 165 233;
+  --info-soft: 240 249 255;
+  --info-fg: 7 89 133;
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --canvas: 9 9 11;
+  --surface: 24 24 27;
+  --surface-2: 39 39 42;
+  --surface-3: 32 32 36;
+
+  --border: 39 39 42;
+  --border-subtle: 32 32 36;
+  --border-strong: 63 63 70;
+
+  --text: 228 228 231;
+  --text-strong: 250 250 250;
+  --text-muted: 161 161 170;
+  --text-subtle: 113 113 122;
+
+  --accent: 129 140 248;
+  --accent-strong: 165 180 252;
+  --accent-soft: 30 27 75;
+  --accent-fg: 9 9 11;
+
+  --success: 52 211 153;
+  --success-soft: 6 78 59;
+  --success-fg: 167 243 208;
+
+  --danger: 251 113 133;
+  --danger-soft: 76 5 25;
+  --danger-fg: 254 205 211;
+
+  --warning: 251 191 36;
+  --warning-soft: 69 26 3;
+  --warning-fg: 253 230 138;
+
+  --info: 56 189 248;
+  --info-soft: 12 74 110;
+  --info-fg: 186 230 253;
+
+  color-scheme: dark;
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv11", "ss01", "ss03";
   }
+  /* Body styles are written as raw CSS (not @apply) so this stylesheet
+     compiles even before the new theme utilities are registered with
+     PostCSS — avoids a chicken-and-egg cache issue on first build. */
   body {
-    @apply h-full bg-zinc-50 text-zinc-900;
+    height: 100%;
+    background-color: rgb(var(--canvas));
+    color: rgb(var(--text));
+    font-family:
+      var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  ::selection {
+    background: rgb(var(--accent) / 0.18);
+  }
+
+  /* Default focus ring tuned to the accent token (replaces ad-hoc rings
+     scattered across components). Only shows on keyboard focus. */
+  :focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgb(var(--surface)),
+      0 0 0 4px rgb(var(--accent) / 0.55);
+    border-radius: inherit;
   }
 }
 
 @layer utilities {
-  /* Soft fade + slight upward translate for content on mount or tab change.
-     Used on dashboard tab content, settings pages, and admin org detail. */
   .fade-in {
     animation: fade-in 180ms ease-out both;
   }
   .fade-in-up {
     animation: fade-in-up 220ms ease-out both;
   }
-
-  /* Number crossfade — applied to KPI value spans when totals refresh.
-     Re-keyed so the animation re-runs on data change. */
   .num-fade {
     animation: num-fade 180ms ease-out both;
   }
 
-  /* Custom thin scrollbar for dense vertical lists (e.g. PieChart legend). */
+  /* Linear-style soft glow behind a focused element */
+  .ring-glow {
+    box-shadow: 0 0 0 4px rgb(var(--accent) / 0.16);
+  }
+
+  /* Card surface with subtle gradient background — gives depth without
+     drawing attention. Used as the default Card variant. */
+  .surface-gradient {
+    background-image: linear-gradient(
+      180deg,
+      rgb(var(--surface) / 1) 0%,
+      rgb(var(--surface-2) / 1) 100%
+    );
+  }
+
+  /* Theme-aware scrollbar (replaces the older zinc-200 fixed colors). */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-zinc-200 rounded-full;
+    background-color: rgb(var(--border-strong));
+    border-radius: 9999px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-zinc-300;
+    background-color: rgb(var(--text-subtle));
+  }
+
+  /* SVG path-draw entrance — used by AreaChart. The element should set
+     `--draw-length` to its `getTotalLength()` and `stroke-dasharray` to the
+     same value; the keyframe animates `stroke-dashoffset` to 0. */
+  .animate-draw {
+    stroke-dasharray: var(--draw-length, 1000);
+    stroke-dashoffset: var(--draw-length, 1000);
+    animation: draw 700ms cubic-bezier(0.2, 0, 0, 1) forwards;
   }
 }
 
@@ -72,11 +206,24 @@
   }
 }
 
-/* Respect users who prefer reduced motion. */
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade-in,
   .fade-in-up,
-  .num-fade {
+  .num-fade,
+  .animate-draw {
     animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
   }
 }

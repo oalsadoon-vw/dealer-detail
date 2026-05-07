@@ -3,6 +3,14 @@
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { fetchApi } from "@/lib/client/fetch-api";
+import {
+  Button,
+  Card,
+  FormField,
+  Input,
+  Select,
+  SectionHeading,
+} from "@/components/ui";
 
 type Store = { id: string; name: string };
 
@@ -72,15 +80,17 @@ export default function UploadClient({
   }
 
   return (
-    <main className="space-y-6">
-      <h1 className="text-xl font-semibold">Upload</h1>
+    <main className="fade-in-up space-y-6">
+      <SectionHeading
+        title="Upload"
+        description="Drop in Tekion exports and we'll ingest them into the latest run for the selected store."
+        size="page"
+      />
 
-      <div className="rounded-lg border bg-white p-4 space-y-4">
+      <Card>
         <div className="grid gap-4 md:grid-cols-3">
-          <label className="space-y-1 text-sm">
-            <div className="font-medium">Store</div>
-            <select
-              className="w-full rounded border px-2 py-2"
+          <FormField label="Store">
+            <Select
               value={storeId}
               onChange={(e) => setStoreId(e.target.value)}
             >
@@ -89,108 +99,143 @@ export default function UploadClient({
                   {s.name}
                 </option>
               ))}
-            </select>
-          </label>
+            </Select>
+          </FormField>
 
-          <label className="space-y-1 text-sm">
-            <div className="font-medium">Business date</div>
-            <input
-              className="w-full rounded border px-2 py-2"
+          <FormField label="Business date">
+            <Input
               type="date"
               value={businessDate}
               onChange={(e) => setBusinessDate(e.target.value)}
             />
-          </label>
+          </FormField>
 
-          <label className="space-y-1 text-sm">
-            <div className="font-medium">Tekion exports (multiple)</div>
-            <input
-              ref={fileInputRef}
-              className="w-full rounded border px-2 py-2"
-              type="file"
-              multiple
-              accept=".xlsx"
-              onChange={(e) => {
-                const picked = Array.from(e.target.files ?? []);
-                addFiles(picked);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-              }}
-            />
-          </label>
+          <FormField
+            label="Tekion exports"
+            helper="Multiple .xlsx files supported"
+          >
+            <label
+              className="group flex h-9 w-full cursor-pointer items-center gap-2 rounded-md border border-dashed border-line bg-surface-2 px-3 text-sm text-fg-muted transition-colors hover:border-accent hover:bg-accent-soft hover:text-accent-fg"
+              tabIndex={0}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                className="shrink-0"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M8 2v8m0 0l-3-3m3 3l3-3M3 13h10"
+                />
+              </svg>
+              <span className="truncate">
+                {files.length
+                  ? `${files.length} file${files.length === 1 ? "" : "s"} selected`
+                  : "Choose files"}
+              </span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".xlsx"
+                className="sr-only"
+                onChange={(e) => {
+                  const picked = Array.from(e.target.files ?? []);
+                  addFiles(picked);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+              />
+            </label>
+          </FormField>
         </div>
 
         {files.length ? (
-          <div className="rounded border bg-zinc-50 p-3 text-sm">
-            <div className="mb-2 font-medium">Selected files ({files.length})</div>
-            <ul className="space-y-1">
+          <div className="mt-4 rounded-md border border-line-subtle bg-surface-2 p-3 text-sm">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="font-medium text-fg-strong">
+                Selected files{" "}
+                <span className="text-fg-subtle">({files.length})</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFiles([])}
+                disabled={loading}
+                className="text-xs text-fg-muted underline-offset-2 transition-colors hover:text-fg-strong hover:underline disabled:opacity-50"
+              >
+                Clear all
+              </button>
+            </div>
+            <ul className="space-y-1.5">
               {files.map((f, idx) => (
                 <li
                   key={`${f.name}-${idx}`}
                   className="flex items-center justify-between gap-2"
                 >
-                  <div className="truncate">
-                    {f.name}{" "}
-                    <span className="text-xs text-zinc-500">
+                  <div className="min-w-0 truncate">
+                    <span className="text-fg-strong">{f.name}</span>{" "}
+                    <span className="text-xs text-fg-subtle tabular-nums">
                       ({Math.round(f.size / 1024)} KB)
                     </span>
                   </div>
                   <button
-                    className="text-xs underline text-zinc-700"
-                    onClick={() => setFiles(files.filter((_, i) => i !== idx))}
                     type="button"
+                    onClick={() => setFiles(files.filter((_, i) => i !== idx))}
                     disabled={loading}
+                    className="text-xs text-fg-muted underline-offset-2 transition-colors hover:text-danger disabled:opacity-50"
                   >
-                    remove
+                    Remove
                   </button>
                 </li>
               ))}
             </ul>
-            <div className="mt-2">
-              <button
-                className="text-xs underline text-zinc-700"
-                type="button"
-                onClick={() => setFiles([])}
-                disabled={loading}
-              >
-                clear all
-              </button>
-            </div>
           </div>
         ) : null}
 
-        <button
-          className="rounded bg-zinc-900 px-4 py-2 text-white disabled:opacity-50"
-          disabled={!canSubmit || loading}
-          onClick={submit}
-        >
-          {loading ? "Ingesting..." : "Ingest"}
-        </button>
-
-        {error ? (
-          <div className="text-sm text-red-700">Error: {error}</div>
-        ) : null}
-      </div>
+        <div className="mt-4 flex items-center gap-3">
+          <Button
+            onClick={submit}
+            disabled={!canSubmit}
+            pending={loading}
+            variant="primary"
+          >
+            {loading ? "Ingesting…" : "Ingest"}
+          </Button>
+          {error ? (
+            <span className="text-sm text-danger-fg">Error: {error}</span>
+          ) : null}
+        </div>
+      </Card>
 
       {result ? (
-        <div className="rounded-lg border bg-white p-4">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="font-medium">Run summary</div>
+        <Card>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-fg-strong">
+              Run summary
+            </div>
             {runId ? (
-              <Link className="text-sm underline" href={`/runs/${runId}`}>
-                View run details
+              <Link
+                className="text-sm text-accent transition-colors hover:text-accent-strong"
+                href={`/runs/${runId}`}
+              >
+                View run details →
               </Link>
             ) : null}
           </div>
           {typeof batchNo === "number" ? (
-            <div className="mb-2 text-sm">
-              <span className="font-medium">Batch #:</span>{" "}
-              <span className="font-mono">{batchNo}</span>
+            <div className="mb-3 text-sm text-fg-muted">
+              <span className="font-medium text-fg-strong">Batch #</span>{" "}
+              <span className="font-mono tabular-nums">{batchNo}</span>
             </div>
           ) : null}
-          <pre className="overflow-auto text-xs">
+          <pre className="max-h-[320px] overflow-auto rounded-md border border-line-subtle bg-surface-2 p-3 text-xs text-fg leading-relaxed">
             {JSON.stringify(result, null, 2)}
           </pre>
-        </div>
+        </Card>
       ) : null}
     </main>
   );

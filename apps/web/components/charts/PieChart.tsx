@@ -1,113 +1,284 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
+import { ParentSize } from "@visx/responsive";
+import { Group } from "@visx/group";
+import { Pie } from "@visx/shape";
+import {
+  useTooltip,
+  TooltipWithBounds,
+  defaultStyles as defaultTooltipStyles,
+} from "@visx/tooltip";
+import { localPoint } from "@visx/event";
 
 export type PieDatum = { label: string; value: number; color?: string };
 
-// Vibrant color palette
-const DEFAULT_COLORS = [
-  "#3b82f6", // Blue
-  "#10b981", // Emerald
-  "#f59e0b", // Amber
-  "#ef4444", // Red
-  "#8b5cf6", // Violet
-  "#ec4899", // Pink
-  "#06b6d4", // Cyan
-  "#f97316", // Orange
-  "#6366f1", // Indigo
-  "#84cc16", // Lime
-];
-
-function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
-  const a = ((angleDeg - 90) * Math.PI) / 180;
-  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
-}
-
-function arcPath(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
-  const start = polarToCartesian(cx, cy, r, endAngle);
-  const end = polarToCartesian(cx, cy, r, startAngle);
-  const large = endAngle - startAngle <= 180 ? 0 : 1;
-  return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${large} 0 ${end.x} ${end.y} Z`;
-}
-
-export function PieChart(props: {
+type Props = {
   title: string;
   data: PieDatum[];
   valueFormatter?: (v: number) => string;
-}) {
-  const fmt = props.valueFormatter ?? ((v: number) => String(v));
+};
 
-  const cleaned = useMemo(() => {
-    return props.data
-      .map((x) => ({ ...x, value: Number.isFinite(x.value) ? x.value : 0 }))
-      .filter((x) => x.value > 0);
-  }, [props.data]);
+/**
+ * Linear/Arc-style donut: a vibrant categorical palette, hover-highlighted
+ * wedge with a floating tooltip, and a flexible legend that always keeps
+ * labels visible (no zero-width truncation in narrow containers).
+ */
+const DEFAULT_PALETTE = [
+  "#6366f1", // indigo
+  "#10b981", // emerald
+  "#f59e0b", // amber
+  "#ef4444", // rose
+  "#8b5cf6", // violet
+  "#ec4899", // pink
+  "#06b6d4", // cyan
+  "#f97316", // orange
+  "#3b82f6", // blue
+  "#84cc16", // lime
+];
 
-  const total = cleaned.reduce((s, d) => s + d.value, 0) || 1;
+const tooltipStyles = {
+  ...defaultTooltipStyles,
+  background: "rgb(var(--surface-3))",
+  color: "rgb(var(--text))",
+  border: "1px solid rgb(var(--border))",
+  borderRadius: 8,
+  padding: "8px 10px",
+  boxShadow: "0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)",
+  fontSize: 12,
+  fontFamily: "var(--font-sans)",
+};
 
-  const slices = useMemo(() => {
-    let angle = 0;
-    return cleaned.map((d, idx) => {
-      const frac = d.value / total;
-      const start = angle;
-      const end = angle + frac * 360;
-      angle = end;
-      return {
-        ...d,
-        start,
-        end,
-        color: d.color ?? DEFAULT_COLORS[idx % DEFAULT_COLORS.length]
-      };
-    });
-  }, [cleaned, total]);
+export function PieChart({ title, data, valueFormatter }: Props) {
+  const fmt = valueFormatter ?? ((v: number) => String(v));
+
+  const cleaned = useMemo(
+    () =>
+      data
+        .map((x, i) => ({
+          ...x,
+          value: Number.isFinite(x.value) ? x.value : 0,
+          color: x.color ?? DEFAULT_PALETTE[i % DEFAULT_PALETTE.length],
+        }))
+        .filter((x) => x.value > 0),
+    [data]
+  );
+
+  const total = cleaned.reduce((s, d) => s + d.value, 0);
 
   return (
     <div className="h-full w-full min-w-0">
-      <div className="mb-4 text-sm font-semibold text-zinc-700">{props.title}</div>
+      <div className="mb-3 text-sm font-semibold text-fg-strong">{title}</div>
       <div className="flex flex-col sm:flex-row items-center gap-6 min-w-0">
-        <svg viewBox="0 0 220 220" className="w-44 h-44 sm:w-52 sm:h-52 shrink-0">
-          {slices.map((s) => (
-            <g key={s.label} className="group cursor-pointer">
-              <path
-                d={arcPath(110, 110, 90, s.start, s.end)}
-                fill={s.color}
-                className="transition-opacity hover:opacity-80"
-              />
-              <title>
-                {s.label}: {fmt(s.value)} ({Math.round((s.value / total) * 100)}%)
-              </title>
-            </g>
-          ))}
-          {/* Inner donut hole */}
-          <circle cx="110" cy="110" r="55" fill="white" />
-          <text x="110" y="108" textAnchor="middle" fontSize="12" fill="#71717a">
-            Total
-          </text>
-          <text x="110" y="130" textAnchor="middle" fontSize="14" fontWeight="700" fill="#18181b">
-            {fmt(total)}
-          </text>
-        </svg>
-
-        <div className="w-full flex-1 min-w-0 space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-          {slices.map((s) => (
-            <div key={s.label} className="flex items-center justify-between gap-3 text-sm group min-w-0">
-              {/* `flex-1 min-w-0` ensures the label group claims available
-                  space and `truncate` actually has room to apply when the
-                  legend column is narrow. Without `flex-1`, `justify-between`
-                  + the value's `shrink-0` would collapse the label to 0 width
-                  and only the colored dot would render. */}
-              <div className="flex flex-1 items-center gap-2 min-w-0">
-                <span className="inline-block h-3 w-3 rounded-full shadow-sm shrink-0" style={{ background: s.color }} />
-                <span className="text-zinc-600 font-medium group-hover:text-zinc-900 transition-colors truncate" title={s.label}>
-                  {s.label}
-                </span>
-              </div>
-              <div className="font-mono text-zinc-700 font-semibold tabular-nums shrink-0">{fmt(s.value)}</div>
-            </div>
-          ))}
-          {cleaned.length === 0 && <div className="text-sm text-zinc-400 italic">No data available</div>}
+        <div className="shrink-0">
+          <ParentSize debounceTime={120}>
+            {({ width }) => {
+              const size = Math.min(220, Math.max(160, width));
+              return (
+                <DonutSvg
+                  size={size}
+                  data={cleaned}
+                  total={total}
+                  fmt={fmt}
+                />
+              );
+            }}
+          </ParentSize>
         </div>
+
+        <Legend data={cleaned} total={total} fmt={fmt} />
       </div>
     </div>
+  );
+}
+
+type CleanedDatum = PieDatum & { color: string };
+
+function DonutSvg({
+  size,
+  data,
+  total,
+  fmt,
+}: {
+  size: number;
+  data: CleanedDatum[];
+  total: number;
+  fmt: (v: number) => string;
+}) {
+  const tooltip = useTooltip<CleanedDatum>();
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
+  const half = size / 2;
+  const outerR = half - 6;
+  const innerR = outerR * 0.62;
+  const accessor = (d: CleanedDatum) => d.value;
+
+  function onMouseMove(
+    event: React.MouseEvent<SVGPathElement>,
+    datum: CleanedDatum
+  ) {
+    const point = localPoint(event);
+    if (!point) return;
+    tooltip.showTooltip({
+      tooltipLeft: point.x,
+      tooltipTop: point.y,
+      tooltipData: datum,
+    });
+  }
+
+  if (data.length === 0) {
+    return (
+      <div
+        className="flex items-center justify-center text-xs italic text-fg-subtle"
+        style={{ width: size, height: size }}
+      >
+        No data
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className="block motion-safe:animate-pop-in"
+      >
+        <Group top={half} left={half}>
+          <Pie<CleanedDatum>
+            data={data}
+            pieValue={accessor}
+            outerRadius={outerR}
+            innerRadius={innerR}
+            cornerRadius={2}
+            padAngle={0.012}
+          >
+            {(pie) =>
+              pie.arcs.map((arc, i) => {
+                const path = pie.path(arc) ?? "";
+                const isHover = hoverIndex === i;
+                const dimmed = hoverIndex !== null && !isHover;
+                return (
+                  <path
+                    key={`${arc.data.label}-${i}`}
+                    d={path}
+                    fill={arc.data.color}
+                    opacity={dimmed ? 0.45 : 1}
+                    style={{
+                      transition: "opacity 140ms ease-out",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      setHoverIndex(i);
+                      onMouseMove(e, arc.data);
+                    }}
+                    onMouseMove={(e) => onMouseMove(e, arc.data)}
+                    onMouseLeave={() => {
+                      setHoverIndex(null);
+                      tooltip.hideTooltip();
+                    }}
+                  />
+                );
+              })
+            }
+          </Pie>
+
+          {/* Center label */}
+          <text
+            textAnchor="middle"
+            y={-4}
+            fontSize={11}
+            fill="rgb(var(--text-subtle))"
+            style={{
+              fontVariantNumeric: "tabular-nums",
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+            }}
+          >
+            Total
+          </text>
+          <text
+            textAnchor="middle"
+            y={16}
+            fontSize={16}
+            fontWeight={700}
+            fill="rgb(var(--text-strong))"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {fmt(total)}
+          </text>
+        </Group>
+      </svg>
+
+      {tooltip.tooltipOpen && tooltip.tooltipData && (
+        <TooltipWithBounds
+          top={tooltip.tooltipTop}
+          left={tooltip.tooltipLeft}
+          style={tooltipStyles}
+        >
+          <div className="flex flex-col gap-0.5">
+            <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-fg-subtle">
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ background: tooltip.tooltipData.color }}
+              />
+              {tooltip.tooltipData.label}
+            </span>
+            <span className="text-sm font-semibold tabular-nums text-fg-strong">
+              {fmt(tooltip.tooltipData.value)}{" "}
+              <span className="font-normal text-fg-subtle">
+                · {Math.round((tooltip.tooltipData.value / total) * 100)}%
+              </span>
+            </span>
+          </div>
+        </TooltipWithBounds>
+      )}
+    </div>
+  );
+}
+
+function Legend({
+  data,
+  total,
+  fmt,
+}: {
+  data: CleanedDatum[];
+  total: number;
+  fmt: (v: number) => string;
+}) {
+  if (data.length === 0) {
+    return <div className="text-sm italic text-fg-subtle">No data</div>;
+  }
+  return (
+    <ul className="w-full flex-1 min-w-0 space-y-1.5 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+      {data.map((s) => (
+        <li
+          key={s.label}
+          className="flex items-center justify-between gap-3 text-sm group min-w-0"
+        >
+          <div className="flex flex-1 items-center gap-2 min-w-0">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+              style={{ background: s.color }}
+            />
+            <span
+              className="truncate font-medium text-fg group-hover:text-fg-strong transition-colors"
+              title={s.label}
+            >
+              {s.label}
+            </span>
+          </div>
+          <div className="flex items-baseline gap-1.5 shrink-0 tabular-nums">
+            <span className="font-mono font-semibold text-fg">
+              {fmt(s.value)}
+            </span>
+            <span className="text-[11px] text-fg-subtle">
+              {Math.round((s.value / total) * 100)}%
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }

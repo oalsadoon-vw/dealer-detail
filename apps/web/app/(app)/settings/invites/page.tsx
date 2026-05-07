@@ -1,29 +1,17 @@
 import { resolveTenantContext } from "@/lib/server/tenant-context";
 import { requireOrgAdmin } from "@/lib/server/authz";
 import { prisma } from "@/lib/db";
+import {
+  Card,
+  CardTitle,
+  CardDescription,
+  Badge,
+  SectionHeading,
+  EmptyState,
+} from "@/components/ui";
 import { InviteForm } from "./invite-form";
 
 export const dynamic = "force-dynamic";
-
-function Badge({
-  children,
-  variant = "default",
-}: {
-  children: React.ReactNode;
-  variant?: "default" | "green" | "yellow" | "red";
-}) {
-  const colors = {
-    default: "bg-zinc-100 text-zinc-700",
-    green: "bg-green-100 text-green-700",
-    yellow: "bg-yellow-100 text-yellow-700",
-    red: "bg-red-100 text-red-700",
-  };
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${colors[variant]}`}>
-      {children}
-    </span>
-  );
-}
 
 export default async function InvitesPage() {
   const tc = await resolveTenantContext();
@@ -54,40 +42,69 @@ export default async function InvitesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border bg-white p-4">
-        <h2 className="font-medium mb-4">Invite a user</h2>
-        <InviteForm stores={stores} />
-      </div>
+      <Card>
+        <CardTitle>Invite a user</CardTitle>
+        <CardDescription>
+          Send an invite to grant a teammate access to this organization.
+        </CardDescription>
+        <div className="mt-4">
+          <InviteForm stores={stores} />
+        </div>
+      </Card>
 
-      <div>
-        <h2 className="font-medium mb-3">Invite History ({invites.length})</h2>
+      <div className="space-y-3">
+        <SectionHeading
+          title="Invite History"
+          description={`${invites.length} ${
+            invites.length === 1 ? "invite" : "invites"
+          } total.`}
+        />
+
         {invites.length > 0 ? (
-          <div className="rounded-lg border bg-white overflow-x-auto">
+          <div className="rounded-lg border border-line bg-surface overflow-x-auto">
             <table className="w-full min-w-[560px] text-sm">
-              <thead className="border-b bg-zinc-50 text-left">
-                <tr>
-                  <th className="p-3 font-medium text-zinc-500">Email</th>
-                  <th className="p-3 font-medium text-zinc-500">Role</th>
-                  <th className="p-3 font-medium text-zinc-500">Status</th>
-                  <th className="p-3 font-medium text-zinc-500">Sent</th>
+              <thead className="bg-surface-2/60 text-fg-subtle">
+                <tr className="border-b border-line">
+                  <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-4 py-3">
+                    Email
+                  </th>
+                  <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-4 py-3">
+                    Role
+                  </th>
+                  <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-4 py-3">
+                    Status
+                  </th>
+                  <th className="text-left text-[10px] font-semibold uppercase tracking-wider px-4 py-3">
+                    Sent
+                  </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-line-subtle">
                 {invites.map((inv) => {
-                  const isPending = !inv.acceptedAt && inv.expiresAt > new Date();
+                  const isPending =
+                    !inv.acceptedAt && inv.expiresAt > new Date();
                   const isAccepted = !!inv.acceptedAt;
                   return (
-                    <tr key={inv.id} className="border-b last:border-b-0">
-                      <td className="p-3">{inv.email}</td>
-                      <td className="p-3">
-                        <Badge>{inv.role.replace(/_/g, " ")}</Badge>
+                    <tr
+                      key={inv.id}
+                      className="hover:bg-accent-soft/40 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-fg-strong font-medium">
+                        {inv.email}
                       </td>
-                      <td className="p-3">
-                        {isAccepted && <Badge variant="green">Accepted</Badge>}
-                        {isPending && <Badge variant="yellow">Pending</Badge>}
-                        {!isAccepted && !isPending && <Badge variant="red">Expired</Badge>}
+                      <td className="px-4 py-3">
+                        <Badge tone="neutral">
+                          {inv.role.replace(/_/g, " ")}
+                        </Badge>
                       </td>
-                      <td className="p-3 text-zinc-500">
+                      <td className="px-4 py-3">
+                        {isAccepted && <Badge tone="success">Accepted</Badge>}
+                        {isPending && <Badge tone="warning">Pending</Badge>}
+                        {!isAccepted && !isPending && (
+                          <Badge tone="danger">Expired</Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-fg-muted">
                         {inv.createdAt.toLocaleDateString()}
                       </td>
                     </tr>
@@ -97,9 +114,12 @@ export default async function InvitesPage() {
             </table>
           </div>
         ) : (
-          <div className="rounded-lg border bg-white p-4 text-sm text-zinc-500">
-            No invites sent yet.
-          </div>
+          <Card>
+            <EmptyState
+              title="No invites sent yet"
+              description="Use the form above to invite a teammate."
+            />
+          </Card>
         )}
       </div>
     </div>

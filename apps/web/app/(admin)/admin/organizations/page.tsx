@@ -1,5 +1,12 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import {
+  LinkButton,
+  SectionHeading,
+  Badge,
+  EmptyState,
+  Card,
+} from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -12,68 +19,96 @@ export default async function OrganizationsListPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold">Organizations</h1>
-          <p className="text-sm text-zinc-500">{orgs.length} total</p>
-        </div>
-        <Link
-          href="/admin/organizations/new"
-          className="rounded-md bg-white text-zinc-950 px-4 py-2 text-sm font-medium hover:bg-zinc-200 transition-colors"
-        >
-          Create Organization
-        </Link>
-      </div>
+    <div className="space-y-6 fade-in-up min-w-0">
+      <SectionHeading
+        title="Organizations"
+        description={`${orgs.length} ${
+          orgs.length === 1 ? "organization" : "organizations"
+        } total.`}
+        size="page"
+        action={
+          <LinkButton href="/admin/organizations/new" variant="primary">
+            Create Organization
+          </LinkButton>
+        }
+      />
 
-      <div className="rounded-lg border border-zinc-800 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="border-b border-zinc-800 bg-zinc-900/50">
-            <tr>
-              <th className="text-left p-3 text-zinc-400 font-medium">Name</th>
-              <th className="text-left p-3 text-zinc-400 font-medium">Slug</th>
-              <th className="text-center p-3 text-zinc-400 font-medium">Stores</th>
-              <th className="text-center p-3 text-zinc-400 font-medium">Members</th>
-              <th className="text-center p-3 text-zinc-400 font-medium">Invites</th>
-              <th className="text-left p-3 text-zinc-400 font-medium">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orgs.map((org) => (
-              <tr
-                key={org.id}
-                className="border-b border-zinc-800/50 last:border-b-0 hover:bg-zinc-900/30 transition-colors"
-              >
-                <td className="p-3">
-                  <Link
-                    href={`/admin/organizations/${org.id}`}
-                    className="font-medium text-white hover:underline"
-                  >
-                    {org.name}
-                  </Link>
-                </td>
-                <td className="p-3 font-mono text-zinc-500">{org.slug}</td>
-                <td className="p-3 text-center">{org._count.stores}</td>
-                <td className="p-3 text-center">{org._count.memberships}</td>
-                <td className="p-3 text-center">{org._count.invites}</td>
-                <td className="p-3 text-zinc-500">
-                  {org.createdAt.toLocaleDateString()}
-                </td>
+      {orgs.length > 0 ? (
+        <div className="rounded-lg border border-line bg-surface overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-2/60 text-fg-subtle">
+              <tr className="border-b border-line">
+                <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                  Slug
+                </th>
+                <th className="text-center px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                  Stores
+                </th>
+                <th className="text-center px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                  Members
+                </th>
+                <th className="text-center px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                  Invites
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider">
+                  Created
+                </th>
               </tr>
-            ))}
-            {orgs.length === 0 && (
-              <tr>
-                <td colSpan={6} className="p-6 text-center text-zinc-600">
-                  No organizations yet.{" "}
-                  <Link href="/admin/organizations/new" className="underline text-zinc-400">
-                    Create one
-                  </Link>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-line-subtle">
+              {orgs.map((org) => (
+                <tr
+                  key={org.id}
+                  className="hover:bg-accent-soft/40 transition-colors"
+                >
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/admin/organizations/${org.id}`}
+                      className="font-medium text-fg-strong hover:text-accent transition-colors"
+                    >
+                      {org.name}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-fg-muted">
+                    {org.slug}
+                  </td>
+                  <td className="px-4 py-3 text-center tabular-nums">
+                    <Badge tone="neutral">{org._count.stores}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-center tabular-nums">
+                    <Badge tone="neutral">{org._count.memberships}</Badge>
+                  </td>
+                  <td className="px-4 py-3 text-center tabular-nums">
+                    {org._count.invites > 0 ? (
+                      <Badge tone="warning">{org._count.invites}</Badge>
+                    ) : (
+                      <Badge tone="neutral">0</Badge>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-fg-muted">
+                    {org.createdAt.toLocaleDateString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <Card>
+          <EmptyState
+            title="No organizations yet"
+            description="Onboard the first customer org to get started."
+            action={
+              <LinkButton href="/admin/organizations/new" variant="primary">
+                Create one
+              </LinkButton>
+            }
+          />
+        </Card>
+      )}
     </div>
   );
 }

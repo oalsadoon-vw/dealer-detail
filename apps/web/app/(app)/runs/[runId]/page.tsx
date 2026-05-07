@@ -1,11 +1,29 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { resolveTenantContext } from "@/lib/server/tenant-context";
 import { requireStoreAccess } from "@/lib/server/authz";
 import { isAppError } from "@/lib/server/errors";
+import {
+  Badge,
+  Card,
+  CardTitle,
+  EmptyState,
+  SectionHeading,
+} from "@/components/ui";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const STATUS_TONE: Record<
+  string,
+  "success" | "danger" | "warning" | "neutral"
+> = {
+  COMPLETED: "success",
+  FAILED: "danger",
+  RUNNING: "warning",
+  PENDING: "warning",
+};
 
 export default async function RunDetailPage({
   params,
@@ -27,8 +45,14 @@ export default async function RunDetailPage({
 
   if (!run)
     return (
-      <main className="rounded border bg-white p-4 text-sm">
-        Run not found.
+      <main className="space-y-6">
+        <SectionHeading title="Run" size="page" />
+        <Card>
+          <EmptyState
+            title="Run not found"
+            description="This run may have been deleted, or you may have followed a stale link."
+          />
+        </Card>
       </main>
     );
 
@@ -36,100 +60,161 @@ export default async function RunDetailPage({
     requireStoreAccess(tc, run.storeId);
   } catch {
     return (
-      <main className="rounded border bg-white p-4 text-sm">
-        You do not have access to this run.
+      <main className="space-y-6">
+        <SectionHeading title="Run" size="page" />
+        <Card>
+          <EmptyState
+            title="No access"
+            description="You do not have permission to view this run."
+          />
+        </Card>
       </main>
     );
   }
 
-  return (
-    <main className="space-y-6">
-      <h1 className="text-xl font-semibold">Run</h1>
+  const businessDate = run.businessDate.toISOString().slice(0, 10);
+  const tone = STATUS_TONE[run.status] ?? "neutral";
 
-      <div className="rounded border bg-white p-4 text-sm space-y-1">
-        <div>
-          <span className="font-medium">Store:</span> {run.store.name}
-        </div>
-        <div>
-          <span className="font-medium">Business date:</span>{" "}
-          {run.businessDate.toISOString().slice(0, 10)}
-        </div>
-        <div>
-          <span className="font-medium">Batch #:</span>{" "}
-          <span className="font-mono">{run.batchNo}</span>
-        </div>
-        <div>
-          <span className="font-medium">Status:</span> {run.status}
-        </div>
+  return (
+    <main className="fade-in-up space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <SectionHeading
+          title={`Run · ${businessDate}`}
+          description={`Batch #${run.batchNo} · ${run.store.name}`}
+          size="page"
+        />
+        <Link
+          href="/runs"
+          className="text-sm text-fg-muted underline-offset-2 transition-colors hover:text-fg-strong hover:underline"
+        >
+          ← Back to runs
+        </Link>
       </div>
 
-      <div className="rounded border bg-white p-4">
-        <div className="mb-2 font-medium">Files</div>
-        <div className="space-y-3">
-          {run.files.map((f) => {
-            const meta = (f.rawMeta ?? {}) as Record<string, unknown>;
-            const headers: string[] = Array.isArray(meta.headers)
-              ? meta.headers
-              : [];
-            const usedSheetName = meta.usedSheetName as string | undefined;
-            const rangeStartRow = meta.rangeStartRow as number | undefined;
-            const detectNotes: string[] = Array.isArray(meta.detectNotes)
-              ? meta.detectNotes
-              : [];
+      <Card>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-4">
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+              Store
+            </dt>
+            <dd className="mt-1 text-fg-strong">{run.store.name}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+              Business date
+            </dt>
+            <dd className="mt-1 text-fg-strong tabular-nums">{businessDate}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+              Batch #
+            </dt>
+            <dd className="mt-1 font-mono text-fg-strong tabular-nums">
+              {run.batchNo}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+              Status
+            </dt>
+            <dd className="mt-1">
+              <Badge tone={tone} size="sm">
+                {run.status}
+              </Badge>
+            </dd>
+          </div>
+        </dl>
+      </Card>
 
-            return (
-              <div key={f.id} className="rounded border p-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="font-medium">{f.originalFilename}</div>
-                  <div className="font-mono">
-                    {f.detectedType ?? "unknown"} (
-                    {Math.round((f.detectionConfidence ?? 0) * 100)}%)
-                  </div>
-                </div>
-                <div className="mt-1 text-xs text-zinc-600">
-                  sheet: {usedSheetName ?? "?"} | headerRowOffset:{" "}
-                  {rangeStartRow ?? "?"}
-                </div>
-                {headers.length ? (
-                  <div className="mt-2 text-xs">
-                    <div className="font-medium">Headers</div>
-                    <div className="mt-1 font-mono whitespace-pre-wrap">
-                      {headers.slice(0, 40).join(" | ")}
+      <Card>
+        <CardTitle className="mb-4">Files</CardTitle>
+        {run.files.length === 0 ? (
+          <EmptyState
+            title="No files"
+            description="This run did not include any files."
+          />
+        ) : (
+          <div className="space-y-3">
+            {run.files.map((f) => {
+              const meta = (f.rawMeta ?? {}) as Record<string, unknown>;
+              const headers: string[] = Array.isArray(meta.headers)
+                ? meta.headers
+                : [];
+              const usedSheetName = meta.usedSheetName as string | undefined;
+              const rangeStartRow = meta.rangeStartRow as number | undefined;
+              const detectNotes: string[] = Array.isArray(meta.detectNotes)
+                ? meta.detectNotes
+                : [];
+              const confidence = Math.round(
+                (f.detectionConfidence ?? 0) * 100
+              );
+
+              return (
+                <div
+                  key={f.id}
+                  className="rounded-md border border-line-subtle bg-surface-2/40 p-3 text-sm"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="font-medium text-fg-strong">
+                      {f.originalFilename}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <Badge tone="neutral" size="sm">
+                        {f.detectedType ?? "unknown"}
+                      </Badge>
+                      <span className="font-mono text-fg-subtle tabular-nums">
+                        {confidence}% match
+                      </span>
                     </div>
                   </div>
-                ) : null}
-                {detectNotes.length ? (
-                  <div className="mt-2 text-xs">
-                    <div className="font-medium">Detector notes</div>
-                    <ul className="list-disc pl-5">
-                      {detectNotes.slice(0, 8).map((n, i) => (
-                        <li key={i}>{n}</li>
-                      ))}
-                    </ul>
+                  <div className="mt-1.5 text-xs text-fg-subtle">
+                    sheet: <span className="font-mono">{usedSheetName ?? "?"}</span>{" "}
+                    · headerRowOffset:{" "}
+                    <span className="font-mono">{rangeStartRow ?? "?"}</span>
                   </div>
-                ) : null}
-                <div className="mt-2 text-xs">
-                  <a
-                    className="underline"
-                    href={`/api/files/${f.id}/preview?limit=15`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Preview first 15 rows (raw)
-                  </a>
+                  {headers.length ? (
+                    <div className="mt-3 text-xs">
+                      <div className="font-semibold text-fg-muted">Headers</div>
+                      <div className="mt-1 break-words font-mono leading-relaxed text-fg">
+                        {headers.slice(0, 40).join(" | ")}
+                      </div>
+                    </div>
+                  ) : null}
+                  {detectNotes.length ? (
+                    <div className="mt-3 text-xs">
+                      <div className="font-semibold text-fg-muted">
+                        Detector notes
+                      </div>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-fg">
+                        {detectNotes.slice(0, 8).map((n, i) => (
+                          <li key={i}>{n}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  <div className="mt-3 text-xs">
+                    <a
+                      className="text-accent transition-colors hover:text-accent-strong"
+                      href={`/api/files/${f.id}/preview?limit=15`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Preview first 15 rows (raw) →
+                    </a>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
 
-      <div className="rounded border bg-white p-4">
-        <div className="mb-2 font-medium">Summary</div>
-        <pre className="overflow-auto text-xs">
+      <Card>
+        <CardTitle className="mb-3">Summary</CardTitle>
+        <pre className="max-h-[400px] overflow-auto rounded-md border border-line-subtle bg-surface-2/60 p-3 text-xs leading-relaxed text-fg">
           {JSON.stringify(run.summary ?? {}, null, 2)}
         </pre>
-      </div>
+      </Card>
     </main>
   );
 }

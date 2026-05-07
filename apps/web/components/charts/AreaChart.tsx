@@ -1,246 +1,297 @@
 "use client";
 
-import React, { useEffect, useId, useRef, useState } from "react";
+import React, { useId, useMemo } from "react";
+import { ParentSize } from "@visx/responsive";
+import { Group } from "@visx/group";
+import { LinePath, AreaClosed, Bar } from "@visx/shape";
+import { scaleLinear, scaleBand } from "@visx/scale";
+import { GridRows } from "@visx/grid";
+import { LinearGradient } from "@visx/gradient";
+import { curveMonotoneX } from "@visx/curve";
+import {
+  useTooltip,
+  TooltipWithBounds,
+  defaultStyles as defaultTooltipStyles,
+} from "@visx/tooltip";
+import { localPoint } from "@visx/event";
 
 export type AreaDatum = { label: string; value: number };
 
-function useContainerWidth<T extends HTMLElement>() {
-  const ref = useRef<T | null>(null);
-  const [width, setWidth] = useState<number>(0);
-
-  useEffect(() => {
-    if (!ref.current || typeof ResizeObserver === "undefined") return;
-    const el = ref.current;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setWidth(Math.round(entry.contentRect.width));
-      }
-    });
-    ro.observe(el);
-    setWidth(Math.round(el.getBoundingClientRect().width));
-    return () => ro.disconnect();
-  }, []);
-
-  return [ref, width] as const;
-}
-
-/**
- * Time-series area chart. Renders a smoothed line over a vertical gradient
- * area fill — same visual language as the landing-page sparkline preview,
- * with axis labels, gridlines, and per-point hover tooltips appropriate
- * for the dashboard.
- */
-export function AreaChart(props: {
+type Props = {
   title: string;
   data: AreaDatum[];
   height?: number;
+  /**
+   * Optional explicit accent color for the line + gradient. Defaults to
+   * the theme `--accent` token, which is dark/light aware.
+   */
   color?: string;
   valueFormatter?: (v: number) => string;
-}) {
-  const reactId = useId();
-  const gradientId = `area-grad-${reactId.replace(/[:]/g, "")}`;
-  const [containerRef, containerWidth] = useContainerWidth<HTMLDivElement>();
+};
 
-  const n = props.data.length;
-  const fmt = props.valueFormatter ?? ((v: number) => String(v));
-  const color = props.color || "#3b82f6";
+const tooltipStyles = {
+  ...defaultTooltipStyles,
+  background: "rgb(var(--surface-3))",
+  color: "rgb(var(--text))",
+  border: "1px solid rgb(var(--border))",
+  borderRadius: 8,
+  padding: "8px 10px",
+  boxShadow: "0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06)",
+  fontSize: 12,
+  fontFamily: "var(--font-sans)",
+};
 
-  // Adapt label rotation + density to rendered pixel width (mirrors BarChart).
-  const effectiveWidth = containerWidth || 640;
-  const needsRotation =
-    effectiveWidth < 480 ? n > 4 : effectiveWidth < 600 ? n > 7 : n > 14;
+export function AreaChart(props: Props) {
+  return (
+    <div className="h-full w-full min-w-0">
+      <div className="mb-3 text-sm font-semibold text-fg-strong">
+        {props.title}
+      </div>
+      <ParentSize debounceTime={120}>
+        {({ width }) =>
+          width > 0 ? (
+            <AreaChartInner width={width} {...props} />
+          ) : (
+            <div style={{ height: props.height ?? 220 }} />
+          )
+        }
+      </ParentSize>
+    </div>
+  );
+}
 
+type InnerProps = Props & { width: number };
+
+function AreaChartInner({
+  width,
+  data,
+  height: heightProp,
+  color,
+  valueFormatter,
+}: InnerProps) {
+  const fmt = valueFormatter ?? ((v: number) => String(v));
+  const accent = color ?? "rgb(var(--accent))";
+  const n = data.length;
+
+  // Adaptive label density (mirrors the old chart's behavior).
+  const needsRotation = width < 480 ? n > 4 : width < 600 ? n > 7 : n > 14;
   const minPxPerLabel = needsRotation ? 24 : 56;
-  const maxLabels = Math.max(2, Math.floor(effectiveWidth / minPxPerLabel));
+  const maxLabels = Math.max(2, Math.floor(width / minPxPerLabel));
   const labelStep = n <= maxLabels ? 1 : Math.ceil(n / maxLabels);
 
-  const height = props.height ?? (needsRotation ? 260 : 220);
-  const width = 640;
-  const padding = {
-    top: 32,
-    right: 20,
-    bottom: needsRotation ? 64 : 40,
-    left: 60,
+  const height = heightProp ?? (needsRotation ? 240 : 200);
+  const margin = {
+    top: 16,
+    right: 12,
+    bottom: needsRotation ? 56 : 32,
+    left: 48,
   };
-  const innerW = width - padding.left - padding.right;
-  const innerH = height - padding.top - padding.bottom;
+  const innerW = Math.max(0, width - margin.left - margin.right);
+  const innerH = Math.max(0, height - margin.top - margin.bottom);
 
-  const values = props.data.map((d) =>
-    Number.isFinite(d.value) ? d.value : 0
+  const values = useMemo(
+    () => data.map((d) => (Number.isFinite(d.value) ? d.value : 0)),
+    [data]
   );
   const max = Math.max(1, ...values);
   const allZero = n > 0 && values.every((v) => v <= 0);
 
-  const tickCount = 5;
-  const ticks = Array.from(
-    { length: tickCount },
-    (_, i) => (max / (tickCount - 1)) * i
+  const xScale = useMemo(
+    () =>
+      scaleBand<string>({
+        domain: data.map((_, i) => String(i)),
+        range: [0, innerW],
+        padding: 0,
+      }),
+    [data, innerW]
+  );
+  const yScale = useMemo(
+    () =>
+      scaleLinear<number>({
+        domain: [0, max],
+        range: [innerH, 0],
+        nice: true,
+      }),
+    [max, innerH]
   );
 
-  // X coordinates: evenly spaced across innerW. Single-point fallback centers.
-  const xStep = n > 1 ? innerW / (n - 1) : innerW;
-  const points = props.data.map((d, i) => {
-    const v = values[i];
-    const x =
-      n === 1
-        ? padding.left + innerW / 2
-        : padding.left + i * xStep;
-    const y = padding.top + innerH - (v / max) * innerH;
-    return { x, y, v, label: d.label };
-  });
+  const xPoint = (i: number) =>
+    (xScale(String(i)) ?? 0) + xScale.bandwidth() / 2;
+  const yPoint = (v: number) => yScale(v) ?? 0;
 
-  const linePath = points
-    .map(
-      (p, i) =>
-        `${i === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`
-    )
-    .join(" ");
+  const tooltip = useTooltip<{ datum: AreaDatum; index: number }>();
 
-  // Close the area to the bottom of the plot box.
-  const baselineY = padding.top + innerH;
-  const areaPath =
-    points.length > 0
-      ? `${linePath} L${(padding.left + innerW).toFixed(2)},${baselineY} L${padding.left.toFixed(2)},${baselineY} Z`
-      : "";
+  function handleMove(event: React.MouseEvent<SVGRectElement>) {
+    if (n === 0) return;
+    const point = localPoint(event);
+    if (!point) return;
+    const xLocal = point.x - margin.left;
+    const step = innerW / Math.max(1, n - 1);
+    const idx = Math.max(
+      0,
+      Math.min(n - 1, n === 1 ? 0 : Math.round(xLocal / step))
+    );
+    const datum = data[idx];
+    tooltip.showTooltip({
+      tooltipLeft: xPoint(idx) + margin.left,
+      tooltipTop: yPoint(values[idx]) + margin.top,
+      tooltipData: { datum, index: idx },
+    });
+  }
+
+  const reactId = useId();
+  const gradientId = `area-grad-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
+  if (allZero) {
+    return (
+      <div
+        className="flex items-center justify-center text-xs italic text-fg-subtle"
+        style={{ height }}
+      >
+        No activity in this range
+      </div>
+    );
+  }
 
   return (
-    <div ref={containerRef} className="h-full w-full min-w-0">
-      <div className="mb-4 text-sm font-semibold text-zinc-700">
-        {props.title}
-      </div>
-      {allZero ? (
-        <div
-          className="flex items-center justify-center text-xs text-zinc-400 italic"
-          style={{ height }}
-        >
-          No activity in this range
-        </div>
-      ) : (
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-auto block overflow-visible"
-        >
-          <defs>
-            <linearGradient
-              id={gradientId}
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="1"
+    <div className="relative">
+      <svg
+        width={width}
+        height={height}
+        className="block overflow-visible"
+        role="img"
+      >
+        <LinearGradient
+          id={gradientId}
+          from={accent}
+          to={accent}
+          fromOpacity={0.32}
+          toOpacity={0}
+        />
+
+        <Group left={margin.left} top={margin.top}>
+          {/* Horizontal grid + Y-axis tick labels */}
+          <GridRows
+            scale={yScale}
+            width={innerW}
+            numTicks={4}
+            stroke="rgb(var(--border-subtle))"
+            strokeDasharray="3,4"
+          />
+          {yScale.ticks(4).map((t) => (
+            <text
+              key={t}
+              x={-10}
+              y={yPoint(t) + 4}
+              textAnchor="end"
+              fontSize={11}
+              fill="rgb(var(--text-subtle))"
+              style={{ fontVariantNumeric: "tabular-nums" }}
             >
-              <stop offset="0%" stopColor={color} stopOpacity={0.32} />
-              <stop offset="100%" stopColor={color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
+              {fmt(t)}
+            </text>
+          ))}
 
-          {/* Gridlines + Y-axis tick labels */}
-          {ticks.map((t) => {
-            const y = padding.top + innerH - (t / max) * innerH;
-            return (
-              <g key={t}>
-                <line
-                  x1={padding.left}
-                  y1={y}
-                  x2={padding.left + innerW}
-                  y2={y}
-                  stroke="#e4e4e7"
-                  strokeWidth={1}
-                  strokeDasharray="4,4"
-                />
-                <text
-                  x={padding.left - 12}
-                  y={y + 4}
-                  textAnchor="end"
-                  fontSize={11}
-                  fill="#71717a"
-                  className="font-medium"
-                >
-                  {fmt(t)}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Area fill */}
-          {areaPath && <path d={areaPath} fill={`url(#${gradientId})`} />}
-
-          {/* Line on top */}
-          {linePath && (
-            <path
-              d={linePath}
-              fill="none"
-              stroke={color}
+          {/* Animated reveal: clip the chart from left to right on mount.
+              `prefers-reduced-motion` users get the final state instantly
+              via the global rule in globals.css. */}
+          <g className="motion-safe:animate-reveal-x">
+            <AreaClosed<AreaDatum>
+              data={data}
+              x={(_, i) => xPoint(i)}
+              y={(d) => yPoint(Number.isFinite(d.value) ? d.value : 0)}
+              yScale={yScale}
+              fill={`url(#${gradientId})`}
+              curve={curveMonotoneX}
+            />
+            <LinePath<AreaDatum>
+              data={data}
+              x={(_, i) => xPoint(i)}
+              y={(d) => yPoint(Number.isFinite(d.value) ? d.value : 0)}
+              stroke={accent}
               strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
+              curve={curveMonotoneX}
             />
-          )}
+          </g>
 
-          {/* Per-point hover targets, dots, value tooltips, and X labels */}
-          {points.map((p, i) => {
-            const showLabel = i % labelStep === 0;
-            const labelY = padding.top + innerH + (needsRotation ? 10 : 16);
-            const hitX = n === 1 ? padding.left : p.x - xStep / 2;
-            const hitW = n === 1 ? innerW : xStep;
-
+          {/* X-axis labels (every Nth) */}
+          {data.map((d, i) => {
+            if (i % labelStep !== 0) return null;
+            const cx = xPoint(i);
+            const labelY = innerH + (needsRotation ? 14 : 18);
             return (
-              <g key={`${p.label}-${i}`} className="group">
-                {/* Invisible hit zone */}
-                <rect
-                  x={hitX}
-                  y={padding.top}
-                  width={hitW}
-                  height={innerH}
-                  fill="transparent"
-                />
-
-                {/* Hover dot */}
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r={4}
-                  fill="white"
-                  stroke={color}
-                  strokeWidth={2}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                />
-
-                {/* Hover value tooltip */}
-                <text
-                  x={p.x}
-                  y={p.y - 10}
-                  textAnchor="middle"
-                  fontSize={n > 20 ? 9 : 11}
-                  fill="#18181b"
-                  fontWeight={600}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  {fmt(p.v)}
-                </text>
-
-                {/* X-axis label */}
-                {showLabel && (
-                  <text
-                    x={p.x}
-                    y={labelY}
-                    textAnchor={needsRotation ? "end" : "middle"}
-                    fontSize={n > 20 ? 9 : 11}
-                    fill="#52525b"
-                    className="font-medium"
-                    transform={
-                      needsRotation
-                        ? `rotate(-45, ${p.x}, ${labelY})`
-                        : undefined
-                    }
-                  >
-                    {p.label}
-                  </text>
-                )}
-              </g>
+              <text
+                key={`${d.label}-${i}`}
+                x={cx}
+                y={labelY}
+                textAnchor={needsRotation ? "end" : "middle"}
+                fontSize={11}
+                fill="rgb(var(--text-muted))"
+                transform={
+                  needsRotation ? `rotate(-45 ${cx} ${labelY})` : undefined
+                }
+              >
+                {d.label}
+              </text>
             );
           })}
-        </svg>
+
+          {/* Crosshair + dot when tooltip is active */}
+          {tooltip.tooltipOpen && tooltip.tooltipData && (
+            <g pointerEvents="none">
+              <line
+                x1={xPoint(tooltip.tooltipData.index)}
+                x2={xPoint(tooltip.tooltipData.index)}
+                y1={0}
+                y2={innerH}
+                stroke="rgb(var(--text-subtle))"
+                strokeWidth={1}
+                strokeDasharray="3,3"
+                opacity={0.5}
+              />
+              <circle
+                cx={xPoint(tooltip.tooltipData.index)}
+                cy={yPoint(values[tooltip.tooltipData.index])}
+                r={5}
+                fill="rgb(var(--surface))"
+                stroke={accent}
+                strokeWidth={2}
+              />
+            </g>
+          )}
+
+          {/* Hit zone — full plot area, drives the tooltip. */}
+          <Bar
+            x={0}
+            y={0}
+            width={innerW}
+            height={innerH}
+            fill="transparent"
+            onMouseMove={handleMove}
+            onMouseLeave={tooltip.hideTooltip}
+          />
+        </Group>
+      </svg>
+
+      {tooltip.tooltipOpen && tooltip.tooltipData && (
+        <TooltipWithBounds
+          top={tooltip.tooltipTop}
+          left={tooltip.tooltipLeft}
+          style={tooltipStyles}
+        >
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">
+              {tooltip.tooltipData.datum.label}
+            </span>
+            <span className="text-sm font-semibold tabular-nums text-fg-strong">
+              {fmt(tooltip.tooltipData.datum.value)}
+            </span>
+          </div>
+        </TooltipWithBounds>
       )}
     </div>
   );
 }
+
