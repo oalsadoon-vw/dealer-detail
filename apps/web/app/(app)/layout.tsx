@@ -22,7 +22,15 @@ export default async function AppLayout({
   if (!sessionUser) redirect("/login");
 
   const hasMemberships = sessionUser.memberships.length > 0;
-  if (!hasMemberships && !sessionUser.isPlatformAdmin) {
+  if (!hasMemberships) {
+    // Platform admins without any org memberships belong in the admin
+    // panel, not the org-scoped app shell. Sending them to /dashboard
+    // here would cause resolveTenantContext to throw (no org context),
+    // which would redirect to /login, which the middleware would
+    // bounce back to /dashboard — an infinite redirect loop.
+    if (sessionUser.isPlatformAdmin) {
+      redirect("/admin");
+    }
     redirect("/pending-access");
   }
 

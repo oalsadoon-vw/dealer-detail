@@ -1,4 +1,7 @@
-import { resolveTenantContext } from "@/lib/server/tenant-context";
+import {
+  resolveTenantContext,
+  loadSessionUserOrNull,
+} from "@/lib/server/tenant-context";
 import { listAccessibleStores } from "@/lib/server/services/stores";
 import {
   loadDashboardData,
@@ -32,7 +35,16 @@ export default async function DashboardPage() {
   try {
     tc = await resolveTenantContext();
   } catch (err) {
-    if (isAppError(err)) redirect("/login");
+    if (isAppError(err)) {
+      // If the user is a platform admin with no org context, sending them
+      // to /login would loop (middleware bounces them back to /dashboard).
+      // Route them to the admin panel instead — that's where they belong.
+      const session = await loadSessionUserOrNull();
+      if (session?.isPlatformAdmin) {
+        redirect("/admin");
+      }
+      redirect("/login");
+    }
     throw err;
   }
 
