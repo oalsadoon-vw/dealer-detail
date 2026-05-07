@@ -4,9 +4,22 @@ import { prisma } from "@/lib/db";
 import { resolveAdminContext } from "@/lib/server/tenant-context";
 import { isValidRole } from "@/lib/types/auth";
 import { audit } from "@/lib/server/audit";
+import { sendInviteEmail } from "@/lib/server/email/send-invite-email";
 import { redirect } from "next/navigation";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Result returned by invite-creation actions. The invite row is always
+ * created on `ok: true`, but `emailWarning` may be set if the actual
+ * email could not be delivered (e.g. SMTP misconfigured, rate limited).
+ * Callers should surface the warning to the admin so they can retry or
+ * resolve the underlying issue.
+ */
+type InviteActionResult =
+  | { ok: true; inviteId: string; emailDelivery: "sent" | "magic_link" }
+  | { ok: true; inviteId: string; emailDelivery: "failed"; emailWarning: string }
+  | { ok: false; error: string };
 
 export async function createOrganizationAction(
   formData: FormData
@@ -120,7 +133,7 @@ export async function createStoreForOrgAction(
 
 export async function createInviteForOrgAction(
   formData: FormData
-): Promise<ActionResult> {
+): Promise<InviteActionResult> {
   const admin = await resolveAdminContext();
 
   const orgId = (formData.get("orgId") as string)?.trim();
@@ -169,7 +182,41 @@ export async function createInviteForOrgAction(
     metadata: { email, role },
   });
 
-  redirect(`/admin/organizations/${orgId}`);
+  // Best-effort email send. The Invite row is already committed, so a
+  // delivery failure does NOT roll back the invite — it just surfaces a
+  // warning to the admin. The invite still works: the recipient can be
+  // signed in via any of their other entry points and the auto-resolution
+  // logic will pick it up.
+  let emailResult;
+  try {
+    emailResult = await sendInviteEmail({
+      email,
+      organizationName: org.name,
+      inviterName: admin.fullName,
+      inviterEmail: admin.email,
+      inviteId: invite.id,
+    });
+  } catch (e) {
+    emailResult = {
+      ok: false as const,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+
+  if (!emailResult.ok) {
+    return {
+      ok: true,
+      inviteId: invite.id,
+      emailDelivery: "failed",
+      emailWarning: emailResult.error,
+    };
+  }
+
+  return {
+    ok: true,
+    inviteId: invite.id,
+    emailDelivery: emailResult.method === "magic_link" ? "magic_link" : "sent",
+  };
 }
 
 /* ───────────────────────────────────────────────────────────────────────────

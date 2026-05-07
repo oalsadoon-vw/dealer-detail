@@ -6,9 +6,15 @@ import { requireOrgAdmin, assertStoreBelongsToOrg } from "@/lib/server/authz";
 import { isValidRole } from "@/lib/types/auth";
 import type { MembershipRole } from "@/lib/types/auth";
 import { audit } from "@/lib/server/audit";
+import { sendInviteEmail } from "@/lib/server/email/send-invite-email";
 import { revalidatePath } from "next/cache";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
+
+type InviteActionResult =
+  | { ok: true; inviteId: string; emailDelivery: "sent" | "magic_link" }
+  | { ok: true; inviteId: string; emailDelivery: "failed"; emailWarning: string }
+  | { ok: false; error: string };
 
 async function resolveOrgAdminContext() {
   const tc = await resolveTenantContext();
@@ -24,7 +30,7 @@ async function countOrgAdmins(orgId: string): Promise<number> {
 
 export async function createInviteAction(
   formData: FormData
-): Promise<ActionResult> {
+): Promise<InviteActionResult> {
   const tc = await resolveOrgAdminContext();
   const orgId = tc.org.organizationId;
 
@@ -77,8 +83,39 @@ export async function createInviteAction(
     metadata: { email, role, storeIds },
   });
 
+  // Best-effort email send. See note in admin.ts → createInviteForOrgAction.
+  let emailResult;
+  try {
+    emailResult = await sendInviteEmail({
+      email,
+      organizationName: tc.org.organizationName,
+      inviterName: tc.user.fullName ?? null,
+      inviterEmail: tc.user.email,
+      inviteId: invite.id,
+    });
+  } catch (e) {
+    emailResult = {
+      ok: false as const,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+
   revalidatePath("/settings/invites");
-  return { ok: true };
+
+  if (!emailResult.ok) {
+    return {
+      ok: true,
+      inviteId: invite.id,
+      emailDelivery: "failed",
+      emailWarning: emailResult.error,
+    };
+  }
+
+  return {
+    ok: true,
+    inviteId: invite.id,
+    emailDelivery: emailResult.method === "magic_link" ? "magic_link" : "sent",
+  };
 }
 
 export async function updateMemberRoleAction(
