@@ -14,7 +14,8 @@
     "prisma:studio": "prisma studio",
     "seed": "tsx scripts/seed.ts",
     "classify:excels": "tsx scripts/classifyExcels.ts /Users/omaralsadoon/Desktop/excels",
-    "test": "vitest run"
+    "test": "vitest run",
+    "tekion:smoke": "tsx --conditions=react-server scripts/tekion-smoke.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",
@@ -36,6 +37,7 @@
     "next": "^14.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "server-only": "^0.0.1",
     "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
