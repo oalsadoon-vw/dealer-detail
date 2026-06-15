@@ -19,11 +19,14 @@ import "server-only";
  * writing — the dashboard's Float columns store dollars (matching the email
  * prototype), so API + email numbers are directly comparable on the dashboard.
  *
- * Count semantics: we count menu/ala as the number of qualifying OPERATIONS
- * (line items), not unique ROs. The email prototype is inconsistent (menu is
- * per-RO, ala is per-row); we pick the operation-level interpretation for both
- * because that's the natural unit in the API payload and the ticket prefers
- * line items. The choice is reported in AggregateResult.warnings for traceability.
+ * Count semantics: menuCount/alaCount are DISTINCT-RO PENETRATION counts —
+ * the number of unique ROs in which the advisor sold at least one menu (or ALA)
+ * operation. This matches the email prototype's `Set<advisor|ro>` dedupe in
+ * lib/parsing/parsers/menuSales.ts so ST (API) and SCVW (email) are comparable
+ * on the same dashboard. Grosses stay summed across ALL qualifying operation
+ * lines (also matches the email prototype). openRos = count of distinct
+ * documentIds per (advisor, businessDate), used as the dashboard's penetration
+ * denominator.
  */
 
 import { prisma } from "@/lib/db";
@@ -58,12 +61,17 @@ interface AdvisorBucket {
   // identity
   advisorId: string;
 
+  // penetration sets: a documentId enters menuRoSet iff the advisor sold ANY
+  // menu op on that RO (same for alaRoSet / ALA). roSet is every documentId
+  // touched by the advisor that day → openRos. Grosses below stay summed.
+  roSet: Set<string>;
+  menuRoSet: Set<string>;
+  alaRoSet: Set<string>;
+
   // metrics (dollars)
-  menuCount: number;
   menuLaborGross: number;
   menuPartsGross: number;
 
-  alaCount: number;
   alaLaborGross: number;
   alaPartsGross: number;
 
@@ -135,10 +143,11 @@ async function ensureAdvisorId(
 function newBucket(advisorId: string): AdvisorBucket {
   return {
     advisorId,
-    menuCount: 0,
+    roSet: new Set<string>(),
+    menuRoSet: new Set<string>(),
+    alaRoSet: new Set<string>(),
     menuLaborGross: 0,
     menuPartsGross: 0,
-    alaCount: 0,
     alaLaborGross: 0,
     alaPartsGross: 0,
     recCount: 0,
@@ -162,6 +171,7 @@ interface DayAccumulators {
 function processPayload(
   payload: any,
   advisorId: string,
+  documentId: string,
   acc: DayAccumulators,
   opcodeMap: OpcodeMap,
   unclassified: Set<string>,
@@ -170,6 +180,9 @@ function processPayload(
     acc.buckets.set(advisorId, newBucket(advisorId));
   }
   const bucket = acc.buckets.get(advisorId)!;
+  // Every RO touched by the advisor counts toward openRos, even if every op is
+  // unclassified — penetration denominator must reflect attempted opportunities.
+  bucket.roSet.add(documentId);
 
   const jobs: any[] = Array.isArray(payload?.jobs) ? payload.jobs : [];
   for (const j of jobs) {
@@ -215,12 +228,13 @@ function processPayload(
 
       switch (mapping.category) {
         case "MENU":
-          bucket.menuCount += 1;
+          // Penetration: dedupe by documentId. Grosses still sum across lines.
+          bucket.menuRoSet.add(documentId);
           bucket.menuLaborGross += laborGross$;
           bucket.menuPartsGross += partsGross$;
           break;
         case "ALA":
-          bucket.alaCount += 1;
+          bucket.alaRoSet.add(documentId);
           bucket.alaLaborGross += laborGross$;
           bucket.alaPartsGross += partsGross$;
           break;
@@ -285,11 +299,11 @@ export async function aggregateMetrics(
   const advisorCache = new Map<string, string>();
   const unclassified = new Set<string>();
   const warnings: string[] = [];
-  const countMode: "operation" | "ro" = "operation";
+  const countMode: "operation" | "ro" = "ro";
   warnings.push(
-    "menu/ala counts are operation-level (line items). The email prototype " +
-      "is inconsistent (menu per-RO, ala per-row); we pick operation-level for " +
-      "consistency in the API path.",
+    "menu/ala counts are distinct-RO penetration counts (dedupe by " +
+      "advisor|documentId), matching the email prototype " +
+      "(lib/parsing/parsers/menuSales.ts).",
   );
   // The recommendation warning is emitted once per run because the payload
   // shape is the same for every RO — there's no point repeating it per row.
@@ -337,7 +351,7 @@ export async function aggregateMetrics(
         advisorCache,
       );
       advisorsTouched.add(advisorId);
-      processPayload(payload, advisorId, acc, opcodeMap, unclassified);
+      processPayload(payload, advisorId, r.documentId, acc, opcodeMap, unclassified);
     }
 
     // 4) Write: delete-then-insert in one transaction. Even if a day has no
@@ -346,6 +360,7 @@ export async function aggregateMetrics(
       storeId: string;
       advisorId: string;
       businessDate: Date;
+      openRos: number;
       menuCount: number;
       menuLaborGross: number;
       menuPartsGross: number;
@@ -375,10 +390,11 @@ export async function aggregateMetrics(
         storeId,
         advisorId: bucket.advisorId,
         businessDate,
-        menuCount: bucket.menuCount,
+        openRos: bucket.roSet.size,
+        menuCount: bucket.menuRoSet.size,
         menuLaborGross: bucket.menuLaborGross,
         menuPartsGross: bucket.menuPartsGross,
-        alaCount: bucket.alaCount,
+        alaCount: bucket.alaRoSet.size,
         alaLaborGross: bucket.alaLaborGross,
         alaPartsGross: bucket.alaPartsGross,
         recCount: bucket.recCount,

@@ -27,6 +27,8 @@ const ST_ABBREVIATION = "ST";
 interface ChecksumRow {
   storeId: string;
   totalMenuCount: number;
+  totalAlaCount: number;
+  totalOpenRos: number;
   totalDailyLaborGross: number;
   rowCount: number;
 }
@@ -34,12 +36,19 @@ interface ChecksumRow {
 async function checksum(storeId: string): Promise<ChecksumRow> {
   const agg = await prisma.advisorDailyMetrics.aggregate({
     where: { storeId },
-    _sum: { menuCount: true, dailyLaborGross: true },
+    _sum: {
+      menuCount: true,
+      alaCount: true,
+      openRos: true,
+      dailyLaborGross: true,
+    },
     _count: { _all: true },
   });
   return {
     storeId,
     totalMenuCount: agg._sum.menuCount ?? 0,
+    totalAlaCount: agg._sum.alaCount ?? 0,
+    totalOpenRos: agg._sum.openRos ?? 0,
     totalDailyLaborGross: agg._sum.dailyLaborGross ?? 0,
     rowCount: agg._count._all,
   };
@@ -77,7 +86,7 @@ async function main() {
   const c1 = await checksum(store.id);
   console.log(`\nchecksum after run #1:`);
   console.log(
-    `  rowCount=${c1.rowCount}  totalMenuCount=${c1.totalMenuCount}  totalDailyLaborGross=${c1.totalDailyLaborGross}`,
+    `  rowCount=${c1.rowCount}  totalMenuCount=${c1.totalMenuCount}  totalAlaCount=${c1.totalAlaCount}  totalOpenRos=${c1.totalOpenRos}  totalDailyLaborGross=${c1.totalDailyLaborGross}`,
   );
 
   // ----- Run 2: idempotency proof -----
@@ -90,12 +99,14 @@ async function main() {
   const c2 = await checksum(store.id);
   console.log(`checksum after run #2:`);
   console.log(
-    `  rowCount=${c2.rowCount}  totalMenuCount=${c2.totalMenuCount}  totalDailyLaborGross=${c2.totalDailyLaborGross}`,
+    `  rowCount=${c2.rowCount}  totalMenuCount=${c2.totalMenuCount}  totalAlaCount=${c2.totalAlaCount}  totalOpenRos=${c2.totalOpenRos}  totalDailyLaborGross=${c2.totalDailyLaborGross}`,
   );
 
   const idempotent =
     c1.rowCount === c2.rowCount &&
     c1.totalMenuCount === c2.totalMenuCount &&
+    c1.totalAlaCount === c2.totalAlaCount &&
+    c1.totalOpenRos === c2.totalOpenRos &&
     Math.abs(c1.totalDailyLaborGross - c2.totalDailyLaborGross) < 1e-6;
   console.log(`\nIDEMPOTENCY: ${idempotent ? "PASS" : "FAIL"}`);
   if (!idempotent) {
