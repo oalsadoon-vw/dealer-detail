@@ -103,8 +103,15 @@ async function main() {
     `advisor seed entries: ${advisorSeed ? Object.keys(advisorSeed).length : "(none)"}`,
   );
 
+  // Window size: default 3 days, override with COLLECT_ST_WINDOW_DAYS for
+  // short kill-tests so we don't burn the Tekion 429 budget on repeat runs.
+  const windowDays = (() => {
+    const raw = process.env.COLLECT_ST_WINDOW_DAYS;
+    const n = raw ? Number(raw) : 3;
+    return Number.isFinite(n) && n > 0 ? n : 3;
+  })();
   const now = new Date();
-  const windowStart = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+  const windowStart = new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
   const windowEnd = now;
   console.log(`window:         ${windowStart.toISOString()} .. ${windowEnd.toISOString()}`);
 
@@ -186,11 +193,48 @@ async function main() {
       `  ${a.nameNormalized.padEnd(28)} raw="${a.nameRaw ?? ""}" tekionUserId=${a.tekionUserId ?? "(null)"}`,
     );
   }
+
+  // Final RESULT block — re-query the SyncRun so we see the *persisted* status
+  // (not a stale in-memory value), and print row count + summary. This must be
+  // the LAST thing printed so a tail of the run log always shows the outcome.
+  const finalRun = await prisma.syncRun.findUnique({
+    where: { id: result.syncRunId },
+    select: {
+      id: true,
+      status: true,
+      summary: true,
+      rosFetched: true,
+      apiCallCount: true,
+      startedAt: true,
+      finishedAt: true,
+    },
+  });
+  const finalRowCount = await prisma.rawRepairOrder.count({
+    where: { storeId: store.id },
+  });
+  console.log("\n=== RESULT ===");
+  console.log(`syncRunId:     ${result.syncRunId}`);
+  console.log(`status:        ${finalRun?.status ?? "(missing)"}`);
+  console.log(`rosFetched:    ${finalRun?.rosFetched ?? "(missing)"}`);
+  console.log(`apiCallCount:  ${finalRun?.apiCallCount ?? "(missing)"}`);
+  console.log(`startedAt:     ${fmtDate(finalRun?.startedAt)}`);
+  console.log(`finishedAt:    ${fmtDate(finalRun?.finishedAt)}`);
+  console.log(`summary:       ${JSON.stringify(finalRun?.summary ?? null)}`);
+  console.log(`rawRepairOrder rows for store: ${finalRowCount}`);
+  console.log("=== END RESULT ===");
+}
+
+async function flushStdout(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    if (process.stdout.writableLength === 0) return resolve();
+    process.stdout.write("", () => resolve());
+  });
 }
 
 main()
   .then(async () => {
     await prisma.$disconnect();
+    await flushStdout();
   })
   .catch(async (err) => {
     console.error("collect-st FAILED:", err);
@@ -198,5 +242,6 @@ main()
       console.error("response body:", (err as { body: unknown }).body);
     }
     await prisma.$disconnect();
+    await flushStdout();
     process.exit(1);
   });

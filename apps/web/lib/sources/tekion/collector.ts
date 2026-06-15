@@ -27,6 +27,7 @@ import {
 } from "./client";
 import { getAdvisorResolver } from "./advisors";
 import type { AdvisorResolver, GetAdvisorResolverOptions } from "./advisors";
+import { reapStaleRuns } from "./reaper";
 import type {
   Job,
   Operation,
@@ -219,6 +220,17 @@ export async function collectRepairOrders(
       dealerId: tekionDealerId,
       ...(params.advisorResolverOptions ?? {}),
     });
+
+  // Self-heal any RUNNING SyncRun rows left orphaned by a prior killed
+  // process (SIGKILL, cron deadline, container eviction). Non-fatal: a reaper
+  // failure must never block a fresh collection.
+  try {
+    await reapStaleRuns();
+  } catch (err) {
+    console.warn(
+      `[collector] reapStaleRuns failed (non-fatal): ${(err as Error).message}`,
+    );
+  }
 
   const syncRun = await prisma.syncRun.create({
     data: {
@@ -479,80 +491,135 @@ export async function collectRepairOrders(
     }
   }
 
+  // -- signal-safe finalize ------------------------------------------------
+  // A single boolean guard prevents the normal completion path AND the signal
+  // handler from both writing the final SyncRun row. The signal handler runs
+  // a best-effort UPDATE then process.exit(130). Listeners are removed in the
+  // `finally` so repeated calls in one process don't stack handlers (this is
+  // critical for any long-lived host — Next.js dev server, scheduled jobs).
+  let finalized = false;
+
+  async function finalizeRun(
+    finalStatus: SyncRunStatus,
+    opts: { fatalError?: Error | null; interruptedBy?: string } = {},
+  ): Promise<void> {
+    if (finalized) return;
+    finalized = true;
+    const finishedAt = new Date();
+    const errorsJson = opts.interruptedBy
+      ? ([{ message: `interrupted by ${opts.interruptedBy}` }] as unknown as never)
+      : opts.fatalError
+        ? ([
+            {
+              message: opts.fatalError.message,
+              stack: opts.fatalError.stack ?? null,
+            },
+          ] as unknown as never)
+        : undefined;
+    await prisma.syncRun.update({
+      where: { id: syncRun.id },
+      data: {
+        status: finalStatus,
+        apiCallCount: counters.apiCallCount,
+        rosFetched: counters.rosFetched,
+        warnings: counters.warnings.length
+          ? (counters.warnings as unknown as never)
+          : undefined,
+        errors: errorsJson,
+        summary: {
+          created: counters.created,
+          updated: counters.updated,
+          unchanged: counters.unchanged,
+          advisorsResolved: counters.advisorsResolved,
+          warningsCount: counters.warnings.length,
+          ...(opts.interruptedBy ? { interruptedBy: opts.interruptedBy } : {}),
+        } as unknown as never,
+        finishedAt,
+      },
+    });
+  }
+
+  const signalHandlers: Partial<Record<NodeJS.Signals, () => void>> = {};
+  const installSignalHandler = (sig: NodeJS.Signals): void => {
+    const handler = () => {
+      // Best-effort: persist FAILED status with what we have, then exit 130.
+      // Errors here are swallowed because the process is on its way out and
+      // there is nowhere meaningful to surface them.
+      void finalizeRun("FAILED", { interruptedBy: sig })
+        .catch((err) => {
+          console.error(
+            `[collector] finalizeRun on ${sig} failed:`,
+            (err as Error).message,
+          );
+        })
+        .finally(() => {
+          process.exit(130);
+        });
+    };
+    signalHandlers[sig] = handler;
+    process.on(sig, handler);
+  };
+  installSignalHandler("SIGINT");
+  installSignalHandler("SIGTERM");
+
   // -- main collection loop -----------------------------------------------
   let fatalError: Error | null = null;
   try {
-    const filters = buildRoSearchFilters(windowStart, windowEnd, dateField);
-    // Collect all ROs first (one page = 1 API call). Each page yields up to 50.
-    const allRos: RepairOrder[] = [];
-    const iter = client.iterateRepairOrders({
-      dealerId: tekionDealerId,
-      filters,
-      pageSize: 50,
-    });
-    // Count search-page API calls as we iterate: every 50 ROs ~= 1 page.
-    let lastBucket = 0;
-    for await (const ro of iter) {
-      allRos.push(ro);
-      const bucket = Math.floor(allRos.length / 50);
-      if (bucket !== lastBucket) {
-        counters.apiCallCount += 1;
-        lastBucket = bucket;
+    try {
+      const filters = buildRoSearchFilters(windowStart, windowEnd, dateField);
+      // Collect all ROs first (one page = 1 API call). Each page yields up to 50.
+      const allRos: RepairOrder[] = [];
+      const iter = client.iterateRepairOrders({
+        dealerId: tekionDealerId,
+        filters,
+        pageSize: 50,
+      });
+      // Count search-page API calls as we iterate: every 50 ROs ~= 1 page.
+      let lastBucket = 0;
+      for await (const ro of iter) {
+        allRos.push(ro);
+        const bucket = Math.floor(allRos.length / 50);
+        if (bucket !== lastBucket) {
+          counters.apiCallCount += 1;
+          lastBucket = bucket;
+        }
       }
+      // Account for the final partial page (and the first page if total < 50).
+      if (allRos.length === 0 || allRos.length % 50 !== 0) {
+        counters.apiCallCount += 1;
+      }
+      counters.rosFetched = allRos.length;
+
+      await pMap(allRos, concurrency, processRo);
+    } catch (err) {
+      fatalError = err as Error;
     }
-    // Account for the final partial page (and the first page if total < 50).
-    if (allRos.length === 0 || allRos.length % 50 !== 0) {
-      counters.apiCallCount += 1;
-    }
-    counters.rosFetched = allRos.length;
 
-    await pMap(allRos, concurrency, processRo);
-  } catch (err) {
-    fatalError = err as Error;
-  }
+    const hasWarnings = counters.warnings.length > 0;
+    const status: SyncRunStatus = fatalError
+      ? "FAILED"
+      : hasWarnings
+        ? "COMPLETED_WITH_WARNINGS"
+        : "COMPLETED";
 
-  const finishedAt = new Date();
-  const hasWarnings = counters.warnings.length > 0;
-  const status: SyncRunStatus = fatalError
-    ? "FAILED"
-    : hasWarnings
-      ? "COMPLETED_WITH_WARNINGS"
-      : "COMPLETED";
+    await finalizeRun(status, { fatalError });
 
-  await prisma.syncRun.update({
-    where: { id: syncRun.id },
-    data: {
+    if (fatalError) throw fatalError;
+
+    return {
+      syncRunId: syncRun.id,
       status,
-      apiCallCount: counters.apiCallCount,
       rosFetched: counters.rosFetched,
-      warnings: counters.warnings.length
-        ? (counters.warnings as unknown as never)
-        : undefined,
-      errors: fatalError
-        ? ([{ message: fatalError.message, stack: fatalError.stack ?? null }] as unknown as never)
-        : undefined,
-      summary: {
-        created: counters.created,
-        updated: counters.updated,
-        unchanged: counters.unchanged,
-        advisorsResolved: counters.advisorsResolved,
-        warningsCount: counters.warnings.length,
-      } as unknown as never,
-      finishedAt,
-    },
-  });
-
-  if (fatalError) throw fatalError;
-
-  return {
-    syncRunId: syncRun.id,
-    status,
-    rosFetched: counters.rosFetched,
-    created: counters.created,
-    updated: counters.updated,
-    unchanged: counters.unchanged,
-    advisorsResolved: counters.advisorsResolved,
-    apiCallCount: counters.apiCallCount,
-    warnings: counters.warnings,
-  };
+      created: counters.created,
+      updated: counters.updated,
+      unchanged: counters.unchanged,
+      advisorsResolved: counters.advisorsResolved,
+      apiCallCount: counters.apiCallCount,
+      warnings: counters.warnings,
+    };
+  } finally {
+    for (const [sig, handler] of Object.entries(signalHandlers)) {
+      if (handler) process.off(sig as NodeJS.Signals, handler);
+    }
+  }
 }
