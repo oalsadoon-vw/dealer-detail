@@ -122,6 +122,9 @@ model Store {
   abbreviation String?
   timezone String?
 
+  tekionDealerId String?
+  apiSyncEnabled Boolean @default(false)
+
   advisors       Advisor[]
   ingestionRuns  IngestionRun[]
   ingestedFiles  IngestedFile[]
@@ -130,6 +133,9 @@ model Store {
   dailyCommodity AdvisorDailyCommodity[]
   emailSources   EmailSource[]
   storeMemberships StoreMembership[]
+  syncRuns         SyncRun[]
+  rawRepairOrders  RawRepairOrder[]
+  opcodeCategories OpcodeCategory[]
 
   @@unique([abbreviation])
   @@index([organizationId])
@@ -143,6 +149,8 @@ model Advisor {
   store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   nameNormalized String
   nameRaw        String?
+
+  tekionUserId String?
 
   dailyMetrics   AdvisorDailyMetrics[]
   dailyCommodity AdvisorDailyCommodity[]
@@ -323,4 +331,84 @@ model AuditLog {
   @@index([organizationId, createdAt])
   @@index([actorId])
   @@index([action])
+}
+
+// ---------------------------------------------------------------------------
+// Tekion OpenAPI pipeline (parallel to the email/Excel ingest)
+// ---------------------------------------------------------------------------
+
+model SyncRun {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  kind        String   // FULL_BACKFILL | INCREMENTAL | MANUAL
+  windowStart DateTime
+  windowEnd   DateTime
+  cursor      String?  // modifiedTime watermark (epoch-ms string) for next incremental
+
+  status       String   @default("RUNNING") // RUNNING | COMPLETED | COMPLETED_WITH_WARNINGS | FAILED
+  apiCallCount Int      @default(0)
+  rosFetched   Int      @default(0)
+
+  warnings Json?
+  errors   Json?
+  summary  Json?
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  rawRepairOrders RawRepairOrder[]
+
+  @@index([storeId, windowStart])
+  @@index([storeId, status])
+}
+
+model RawRepairOrder {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  fetchedAt DateTime @default(now())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  syncRunId String?
+  syncRun   SyncRun? @relation(fields: [syncRunId], references: [id], onDelete: SetNull)
+
+  documentId     String   // Tekion internal RO id (stable natural key)
+  documentNumber String   // RO number shown to users
+  status         String?
+  payType        String?
+  advisorTekionId String?
+  vin            String?
+
+  openDate     DateTime?
+  closeDate    DateTime?
+  businessDate DateTime    // date dimension (midnight UTC) for daily aggregation
+
+  payload     Json    // full RO incl. nested jobs/operations/parts snapshot
+  contentHash String  // sha256 of payload for idempotent upsert / change detection
+
+  @@unique([storeId, documentId])
+  @@index([storeId, businessDate])
+  @@index([syncRunId])
+}
+
+model OpcodeCategory {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // storeId NULL = global default; non-null = store-specific override
+  storeId String?
+  store   Store?  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  opcode   String
+  category String  // MENU | ALA | REC | COMMODITY
+  commodityKey String?  // when category=COMMODITY, e.g. "tires", "alignment"
+
+  @@unique([storeId, opcode])
+  @@index([category])
 }
