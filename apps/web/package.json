@@ -16,7 +16,9 @@
     "classify:excels": "tsx scripts/classifyExcels.ts /Users/omaralsadoon/Desktop/excels",
     "test": "vitest run",
     "tekion:smoke": "tsx --conditions=react-server scripts/tekion-smoke.ts",
-    "collect:st": "tsx --conditions=react-server scripts/collect-st.ts"
+    "collect:st": "tsx --conditions=react-server scripts/collect-st.ts",
+    "seed:opcodes": "tsx --conditions=react-server scripts/seed-opcode-categories.ts",
+    "aggregate:st": "tsx --conditions=react-server scripts/aggregate-st.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",
