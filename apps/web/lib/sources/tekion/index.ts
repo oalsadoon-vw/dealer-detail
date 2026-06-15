@@ -16,6 +16,19 @@ export {
   partLineSaleCents,
 } from "./money";
 export { TokenBucket, tekionLimiter, backoffMs, sleep } from "./throttle";
+export {
+  ApiAdvisorResolver,
+  BrowserAdvisorResolver,
+  getAdvisorResolver,
+  resolveAdvisorName,
+} from "./advisors";
+export type {
+  AdvisorResolver,
+  AdvisorResolverKind,
+  ApiAdvisorResolverConfig,
+  BrowserAdvisorResolverConfig,
+  GetAdvisorResolverOptions,
+} from "./advisors";
 export type {
   EpochMs,
   FilterField,

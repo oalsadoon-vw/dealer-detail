@@ -9,12 +9,29 @@
  *  to its react-server no-op shim. Inside Next.js this is automatic.)
  */
 
+import { readFileSync } from "node:fs";
+
 import {
   TekionClient,
   extractUserDisplayName,
+  getAdvisorResolver,
   laborGrossCents,
+  resolveAdvisorName,
 } from "../lib/sources/tekion";
 import type { RepairOrder } from "../lib/sources/tekion";
+
+const SCT_ADVISOR_CACHE_PATH =
+  "/home/itadmin/tekion-reports/data/sct-advisor-cache.json";
+
+function loadSctAdvisorSeed(): Record<string, string> | undefined {
+  try {
+    const raw = readFileSync(SCT_ADVISOR_CACHE_PATH, "utf8");
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    return parsed && typeof parsed === "object" ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 const DEALER_ID = "americanmotorscorporation_876_0";
 
@@ -58,6 +75,35 @@ async function main() {
   console.log(`  documentNumber:      ${ro.documentNumber ?? "n/a"}`);
   console.log(`  status:              ${ro.status ?? "n/a"}`);
   console.log(`  assignee.advisor.id: ${advisorId ?? "n/a"}\n`);
+
+  // ---- pluggable advisor name resolver ----
+  const resolverKind =
+    (process.env.TEKION_ADVISOR_RESOLVER ?? "browser").toLowerCase() === "api"
+      ? "api"
+      : "browser";
+  const seed = loadSctAdvisorSeed();
+  const resolver = getAdvisorResolver({
+    dealerId: DEALER_ID,
+    seed,
+  });
+  console.log(`advisor resolver (pluggable):`);
+  console.log(`  TEKION_ADVISOR_RESOLVER: ${resolverKind}`);
+  console.log(
+    `  seed entries:            ${seed ? Object.keys(seed).length : "(none)"}`,
+  );
+  if (advisorId) {
+    const name = await resolver.resolve(advisorId);
+    console.log(`  first RO advisor.id:     ${advisorId}`);
+    console.log(`  resolved name:           ${name ?? "(unresolved)"}`);
+  } else {
+    console.log(`  first RO has no advisor id — skipping resolver call for first RO`);
+  }
+  // Sanity-check the known id 59 -> "Edgardo Oliver" (verified 2026-06-15).
+  const probe = await resolveAdvisorName("59", {
+    dealerId: DEALER_ID,
+    seed,
+  });
+  console.log(`  probe id 59 ->           ${probe ?? "(unresolved)"}\n`);
 
   // The "first" RO at SCT in the last 3 days is often UNASSIGNED (just created,
   // no jobs yet). Scan the page for an RO that actually has jobs+operations so
