@@ -1,0 +1,66 @@
+Subject: API Scope Request — Enable Employee/User + GL Data endpoints on our app (production)
+
+Hi [Tekion contact],
+
+We're building a production integration on the Tekion OpenAPI (v4.0.0) for American Motors
+Group and need a couple of endpoint scopes enabled on our app registration.
+
+Our app is currently installed at the dealership as version **0.0.0-pilot-1.0.0**. Several
+endpoints we need return a 403 with the message:
+
+    "The app version 0.0.0-pilot-1.0.0 installed in the dealer does not support this API version."
+
+This tells us the endpoints are valid but our pilot app install isn't scoped/entitled for them.
+
+WHAT WORKS TODAY (no action needed — listed for context):
+  - Repair Orders        POST /openapi/v4.0.0/repair-orders:search        → 200 OK
+  - Service Appointments POST /openapi/v4.0.0/service-appointments:search → 200 OK
+  - Parts Inventory      POST /openapi/v4.0.0/parts-inventory:search      → 200 OK
+  - Vehicle Inventory    POST /openapi/v4.0.0/vehicle-inventory:search    → 200 OK
+
+WHAT WE NEED ENABLED (currently 403 "app version does not support this API version"):
+  1. Employee / User API
+       GET  /openapi/v4.0.0/users/{id}            (resolve a user/advisor id → name)
+       GET  /openapi/v4.0.0/users                 (list users)
+       POST /openapi/v4.0.0/users-by-permissions  (search users by permission)
+     Reason: repair orders return the service advisor as a nested id
+     (assignee.advisor.id), and we need to resolve those ids to advisor names
+     server-to-server for our reporting dashboard. There is no name in the RO payload itself.
+
+  2. User Management — Dealer Roles
+       GET  /openapi/v4.0.0/roles/{id}            (returns 403, same block)
+
+  3. General Ledger Data
+       GET  /openapi/v4.0.0/general-ledger/balances/all
+       GET  /openapi/v4.0.0/general-ledger/balances/differential
+     These currently return 400 "unexpected.error" — we believe they need required
+     query parameters and/or scope. Please confirm the correct required parameters
+     (e.g. accountingDate / period / pagination) and enable the scope for our app.
+
+  4. Service Recommendations / Multi-Point Inspection (MPVI) Results
+     We need the DECLINED / recommended-but-not-sold service lines to compute a
+     "recommendation closing %" (rec work sold ÷ rec work recommended) per advisor.
+     The repair-orders:search payload returns SOLD operations only — declined/authorization
+     inspection lines are NOT present. In Tekion Report Builder these appear as DECLINED /
+     AUTHORIZATION opcode rows on the RO. Please advise which OpenAPI endpoint exposes
+     multi-point inspection results / recommendation status (recommended vs declined vs sold,
+     with amounts) server-to-server, or enable it on our app if it exists but is scope-gated.
+
+ALSO REQUESTED:
+  - Please promote our app registration off the pilot version (0.0.0-pilot-1.0.0) to a
+    standard production version so these scopes apply at the dealership installs.
+
+Our integration details:
+  - app_id: 4ec8bf78-9322-4c25-ae1e-34f73d6eeb50
+  - Environment: production (https://api.tekioncloud.com)
+  - Tenant: americanmotorscorporation
+  - Dealer used for testing: Stevens Creek Toyota (americanmotorscorporation_876_0 / store 876)
+  - The same scopes should apply across all 7 of our rooftops (AR, BC, BT, ST, SV, TL, VC).
+
+Could you let us know what's needed on our side (app version bump, scope grant, re-install at
+the dealer) and the expected turnaround? Happy to hop on a call if that's faster.
+
+Thanks,
+Joe Castelino
+VP of Fixed Operations, American Motors Group
+jcastelino@americanmotorscorp.com
