@@ -133,6 +133,13 @@ function safeDiv(n: number, d: number) {
   return d === 0 ? 0 : n / d;
 }
 
+// Em dash + tooltip-style subtext used wherever a rec-percentage denominator
+// is zero. Keeps the rule generic (denominator 0 → "—") so any future API
+// store with no rec data behaves the same way as SCT.
+const EM_DASH = "—";
+const REC_NA_SUBTEXT =
+  "Recommendation data not available via Tekion API (pending scope)";
+
 // --- Page ---
 
 export default function DashboardClient({
@@ -333,6 +340,26 @@ export default function DashboardClient({
           title="Dashboard"
           description="Performance metrics and advisor insights."
           size="page"
+          action={
+            // Range view always has run=null (runs are per-day), so the
+            // signal is only meaningful for the single-day view.
+            data &&
+            data.advisors.length > 0 &&
+            data.businessDate !== null ? (
+              <Badge
+                tone={data.run === null ? "info" : "neutral"}
+                size="sm"
+                dot
+                title={
+                  data.run === null
+                    ? "Metrics sourced from the Tekion API"
+                    : "Metrics sourced from email file ingestion"
+                }
+              >
+                {data.run === null ? "API" : "Email"}
+              </Badge>
+            ) : undefined
+          }
         />
 
         <Tabs<TabId>
@@ -475,9 +502,23 @@ export default function DashboardClient({
                 />
                 <Stat
                   label="Rec Closing %"
-                  value={pct(totals.recClosingPct)}
-                  subtext={`${fmtMoney(totals.recSoldAmountTotal)} sold`}
-                  tone={totals.recClosingPct >= 0.5 ? "success" : "neutral"}
+                  value={
+                    totals.recAmountTotal === 0
+                      ? EM_DASH
+                      : pct(totals.recClosingPct)
+                  }
+                  subtext={
+                    totals.recAmountTotal === 0
+                      ? REC_NA_SUBTEXT
+                      : `${fmtMoney(totals.recSoldAmountTotal)} sold`
+                  }
+                  tone={
+                    totals.recAmountTotal === 0
+                      ? "neutral"
+                      : totals.recClosingPct >= 0.5
+                        ? "success"
+                        : "neutral"
+                  }
                 />
               </div>
 
@@ -614,8 +655,21 @@ export default function DashboardClient({
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
               <Stat
                 label="Closing %"
-                value={pct(totals.recClosingPct)}
-                tone={totals.recClosingPct >= 0.5 ? "success" : "neutral"}
+                value={
+                  totals.recAmountTotal === 0
+                    ? EM_DASH
+                    : pct(totals.recClosingPct)
+                }
+                subtext={
+                  totals.recAmountTotal === 0 ? REC_NA_SUBTEXT : undefined
+                }
+                tone={
+                  totals.recAmountTotal === 0
+                    ? "neutral"
+                    : totals.recClosingPct >= 0.5
+                      ? "success"
+                      : "neutral"
+                }
               />
               <Stat label="Rec Amount" value={fmtMoney(totals.recAmountTotal)} />
               <Stat label="Sold Amount" value={fmtMoney(totals.recSoldAmountTotal)} tone="success" />
@@ -746,14 +800,26 @@ function fullPictureColumns(
       header: "Rec Close %",
       sortable: true,
       sortValue: (r) => r.fp.recClosingPct,
-      cell: (r) => (
-        <Badge
-          tone={r.fp.recClosingPct >= 0.5 ? "success" : "neutral"}
-          size="md"
-        >
-          {`${num2(r.fp.recClosingPct * 100)}%`}
-        </Badge>
-      ),
+      cell: (r) => {
+        if (r.a.metrics.recAmount === 0) {
+          return (
+            <span
+              className="text-fg-muted tabular-nums"
+              title={REC_NA_SUBTEXT}
+            >
+              {EM_DASH}
+            </span>
+          );
+        }
+        return (
+          <Badge
+            tone={r.fp.recClosingPct >= 0.5 ? "success" : "neutral"}
+            size="md"
+          >
+            {`${num2(r.fp.recClosingPct * 100)}%`}
+          </Badge>
+        );
+      },
     },
     {
       key: "daily_gross",
@@ -948,6 +1014,16 @@ function closingColumns(
       sortable: true,
       sortValue: (a) => safeDiv(a.metrics.recSoldAmount, a.metrics.recAmount),
       cell: (a) => {
+        if (a.metrics.recAmount === 0) {
+          return (
+            <span
+              className="text-fg-muted tabular-nums"
+              title={REC_NA_SUBTEXT}
+            >
+              {EM_DASH}
+            </span>
+          );
+        }
         const close = safeDiv(a.metrics.recSoldAmount, a.metrics.recAmount);
         return (
           <Badge tone={close >= 0.5 ? "success" : "neutral"}>
