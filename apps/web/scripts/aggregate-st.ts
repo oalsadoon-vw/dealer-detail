@@ -22,7 +22,7 @@ import { prisma } from "../lib/db";
 import { aggregateMetrics } from "../lib/aggregate/aggregator";
 import { computeFullPicture } from "../lib/fullPicture";
 
-const ST_ABBREVIATION = "ST";
+const ST_TEKION_DEALER_ID = "americanmotorscorporation_876_0";
 
 interface ChecksumRow {
   storeId: string;
@@ -60,14 +60,17 @@ function fmt$(n: number): string {
 
 async function main() {
   console.log("\n=== T4 aggregator — Stevens Creek Toyota ===");
-  const store = await prisma.store.findUnique({
-    where: { abbreviation: ST_ABBREVIATION },
-    select: { id: true, name: true },
+  const store = await prisma.store.findFirst({
+    where: { tekionDealerId: ST_TEKION_DEALER_ID },
+    select: { id: true, name: true, abbreviation: true },
   });
   if (!store) {
-    throw new Error(`Store with abbreviation=${ST_ABBREVIATION} not found. Run collect:st first.`);
+    throw new Error(
+      `No Store with tekionDealerId='${ST_TEKION_DEALER_ID}' found. ` +
+        "Run `npm run consolidate:st` to set up the real SCT store, then retry.",
+    );
   }
-  console.log(`storeId: ${store.id}  (${store.name})`);
+  console.log(`storeId: ${store.id}  (${store.name}, abbreviation=${store.abbreviation ?? "(null)"})`);
 
   const rawCount = await prisma.rawRepairOrder.count({
     where: { storeId: store.id },

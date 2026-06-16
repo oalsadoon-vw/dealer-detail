@@ -18,7 +18,9 @@
     "tekion:smoke": "tsx --conditions=react-server scripts/tekion-smoke.ts",
     "collect:st": "tsx --conditions=react-server scripts/collect-st.ts",
     "seed:opcodes": "tsx --conditions=react-server scripts/seed-opcode-categories.ts",
-    "aggregate:st": "tsx --conditions=react-server scripts/aggregate-st.ts"
+    "aggregate:st": "tsx --conditions=react-server scripts/aggregate-st.ts",
+    "consolidate:st": "tsx --conditions=react-server scripts/consolidate-st-store.ts",
+    "sync:st": "tsx --conditions=react-server scripts/sync-st.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",

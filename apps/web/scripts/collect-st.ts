@@ -16,12 +16,7 @@ import { readFileSync } from "node:fs";
 import { prisma } from "../lib/db";
 import { collectRepairOrders } from "../lib/sources/tekion/collector";
 
-const ST_ORG_ID = "10000000-0000-0000-0000-000000000099";
-const ST_STORE_ID = "30000000-0000-0000-0000-000000000099";
 const ST_TEKION_DEALER_ID = "americanmotorscorporation_876_0";
-const ST_ABBREVIATION = "ST";
-const ST_NAME = "Stevens Creek Toyota";
-const ST_TIMEZONE = "America/Los_Angeles";
 const SCT_ADVISOR_CACHE_PATH =
   "/home/itadmin/tekion-reports/data/sct-advisor-cache.json";
 
@@ -35,56 +30,33 @@ function loadSctAdvisorSeed(): Record<string, string> | undefined {
   }
 }
 
-async function ensureStStore(): Promise<{ id: string }> {
-  const existing = await prisma.store.findUnique({
-    where: { abbreviation: ST_ABBREVIATION },
+/**
+ * Resolve the Stevens Creek Toyota store by its tekionDealerId. After T5
+ * consolidation, this is the REAL store (abbreviation 'SCT'). We will NEVER
+ * create a new throwaway 'ST' row here — fail loudly if it isn't found so the
+ * operator runs `npm run consolidate:st` first.
+ */
+async function resolveStStore(): Promise<{ id: string }> {
+  const existing = await prisma.store.findFirst({
+    where: { tekionDealerId: ST_TEKION_DEALER_ID },
+    select: { id: true, name: true, abbreviation: true, apiSyncEnabled: true },
   });
-  if (existing) {
-    if (
-      existing.tekionDealerId !== ST_TEKION_DEALER_ID ||
-      !existing.apiSyncEnabled
-    ) {
-      const updated = await prisma.store.update({
-        where: { id: existing.id },
-        data: {
-          tekionDealerId: ST_TEKION_DEALER_ID,
-          apiSyncEnabled: true,
-        },
-      });
-      return { id: updated.id };
-    }
-    return { id: existing.id };
+  if (!existing) {
+    throw new Error(
+      `No Store with tekionDealerId='${ST_TEKION_DEALER_ID}' found. ` +
+        "Run `npm run consolidate:st` to set up the real SCT store, then retry.",
+    );
   }
-  await prisma.organization.upsert({
-    where: { id: ST_ORG_ID },
-    update: {},
-    create: {
-      id: ST_ORG_ID,
-      name: "Stevens Creek Group",
-      slug: "stevens-creek",
-    },
-  });
-  const store = await prisma.store.upsert({
-    where: { id: ST_STORE_ID },
-    update: {
-      tekionDealerId: ST_TEKION_DEALER_ID,
-      apiSyncEnabled: true,
-      organizationId: ST_ORG_ID,
-      name: ST_NAME,
-      abbreviation: ST_ABBREVIATION,
-      timezone: ST_TIMEZONE,
-    },
-    create: {
-      id: ST_STORE_ID,
-      organizationId: ST_ORG_ID,
-      name: ST_NAME,
-      abbreviation: ST_ABBREVIATION,
-      timezone: ST_TIMEZONE,
-      tekionDealerId: ST_TEKION_DEALER_ID,
-      apiSyncEnabled: true,
-    },
-  });
-  return { id: store.id };
+  if (!existing.apiSyncEnabled) {
+    throw new Error(
+      `Store ${existing.id} (${existing.abbreviation ?? "?"}) has apiSyncEnabled=false. ` +
+        "Run `npm run consolidate:st` to enable API sync.",
+    );
+  }
+  console.log(
+    `resolved store by tekionDealerId: id=${existing.id} abbrev=${existing.abbreviation ?? "(null)"} name="${existing.name}"`,
+  );
+  return { id: existing.id };
 }
 
 function fmtDate(d: Date | null | undefined): string {
@@ -94,7 +66,7 @@ function fmtDate(d: Date | null | undefined): string {
 
 async function main() {
   console.log("\n=== T3 collector — Stevens Creek Toyota ===");
-  const store = await ensureStStore();
+  const store = await resolveStStore();
   console.log(`storeId:        ${store.id}`);
   console.log(`tekionDealerId: ${ST_TEKION_DEALER_ID}`);
 
