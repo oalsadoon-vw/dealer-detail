@@ -28,7 +28,10 @@ import type {
 
 const OPENAPI_PREFIX = "/openapi/v4.0.0";
 const TOKEN_PATH = "/openapi/public/tokens";
-const USER_PATH_PREFIX = "/userservice/u/apc/users";
+// Public OpenAPI user lookup. Joe upgraded the app's API scope (2026-06-18) so
+// GET /openapi/v4.0.0/users/{id} now resolves names server-to-server, retiring
+// the internal browser-session endpoint (/userservice/u/apc/users).
+const USER_PATH_PREFIX = `${OPENAPI_PREFIX}/users`;
 const TOKEN_EXPIRY_SAFETY_MS = 5 * 60 * 1000;
 const DEFAULT_TOKEN_TTL_MS = 50 * 60 * 1000;
 const MAX_RETRIES = 4;
@@ -374,9 +377,20 @@ export class TekionClient {
         dealerId,
       );
     } catch (err) {
-      if (err instanceof TekionApiError && err.status === 404) {
-        this.userNameCache.set(userId, null);
-        return { name: null, sourceField: null };
+      // Tekion returns 400 {code:"no.user.found"} (NOT 404) for an unknown id.
+      // Treat both as "unresolved → null" so the collector continues gracefully.
+      if (err instanceof TekionApiError) {
+        const body =
+          typeof err.body === "string"
+            ? err.body
+            : JSON.stringify(err.body ?? "");
+        const notFound =
+          err.status === 404 ||
+          (err.status === 400 && /no\.user\.found/i.test(body));
+        if (notFound) {
+          this.userNameCache.set(userId, null);
+          return { name: null, sourceField: null };
+        }
       }
       throw err;
     }
@@ -406,6 +420,38 @@ export function extractUserDisplayName(raw: unknown): {
   candidates.push(root);
 
   for (const obj of candidates) {
+    // Public OpenAPI shape (preferred): data.userNameDetails.completeNames[DISPLAY_NAME].value,
+    // falling back to userNameDetails.firstName + lastName.
+    const und = obj.userNameDetails;
+    if (und && typeof und === "object") {
+      const u = und as Record<string, unknown>;
+      const completeNames = Array.isArray(u.completeNames)
+        ? (u.completeNames as Array<Record<string, unknown>>)
+        : [];
+      const displayEntry = completeNames.find(
+        (c) =>
+          c &&
+          typeof c.value === "string" &&
+          (c.value as string).trim() &&
+          String(c.nameType).toUpperCase() === "DISPLAY_NAME",
+      );
+      if (displayEntry) {
+        return {
+          name: (displayEntry.value as string).trim(),
+          sourceField: "data.userNameDetails.completeNames[DISPLAY_NAME]",
+        };
+      }
+      const undFirst =
+        typeof u.firstName === "string" ? u.firstName.trim() : "";
+      const undLast = typeof u.lastName === "string" ? u.lastName.trim() : "";
+      if (undFirst || undLast) {
+        return {
+          name: `${undFirst} ${undLast}`.trim(),
+          sourceField: "data.userNameDetails.firstName + lastName",
+        };
+      }
+    }
+
     const display = obj.displayName;
     if (typeof display === "string" && display.trim()) {
       return { name: display.trim(), sourceField: "data.displayName" };

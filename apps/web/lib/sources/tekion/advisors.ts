@@ -85,7 +85,7 @@ export class ApiAdvisorResolver implements AdvisorResolver {
         if (!this.warned403) {
           this.warned403 = true;
           console.warn(
-            "[tekion advisors] /users/{id} returned 403 — pilot app scope not granted yet; falling back to null. Switch TEKION_ADVISOR_RESOLVER=browser for interim resolution.",
+            "[tekion advisors] /users/{id} returned 403 — app API scope not granted for user lookups. Names will be null until Tekion re-grants scope.",
           );
         }
         this.cache.set(advisorId, null);
@@ -239,8 +239,11 @@ export interface GetAdvisorResolverOptions {
 
 function detectKind(opts?: GetAdvisorResolverOptions): AdvisorResolverKind {
   if (opts?.kind) return opts.kind;
-  const env = (process.env.TEKION_ADVISOR_RESOLVER ?? "browser").toLowerCase();
-  return env === "api" ? "api" : "browser";
+  // Default to the public OpenAPI resolver (Joe upgraded API scope 2026-06-18 so
+  // GET /openapi/v4.0.0/users/{id} resolves names server-to-server). The browser
+  // resolver remains available via TEKION_ADVISOR_RESOLVER=browser as a fallback.
+  const env = (process.env.TEKION_ADVISOR_RESOLVER ?? "api").toLowerCase();
+  return env === "browser" ? "browser" : "api";
 }
 
 let cachedResolver: AdvisorResolver | null = null;
