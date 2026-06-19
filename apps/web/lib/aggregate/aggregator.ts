@@ -119,6 +119,7 @@ async function ensureAdvisorId(
   storeId: string,
   rawName: string | null,
   tekionId: string | null,
+  persona: string | null,
   cache: Map<string, string>,
 ): Promise<string> {
   const { nameNormalized, nameRaw } = nameToNormalized(rawName);
@@ -132,8 +133,13 @@ async function ensureAdvisorId(
       nameNormalized,
       nameRaw: nameRaw ?? nameNormalized,
       tekionUserId: tekionId,
+      persona,
     },
-    update: tekionId ? { tekionUserId: tekionId } : {},
+    // Never clobber a known persona/tekionId with null.
+    update: {
+      ...(tekionId ? { tekionUserId: tekionId } : {}),
+      ...(persona ? { persona } : {}),
+    },
     select: { id: true },
   });
   cache.set(cacheKey, advisor.id);
@@ -333,6 +339,10 @@ export async function aggregateMetrics(
         typeof payload?.advisorName === "string" && payload.advisorName.trim()
           ? payload.advisorName
           : null;
+      const advisorPersona: string | null =
+        typeof payload?.advisorPersona === "string" && payload.advisorPersona.trim()
+          ? payload.advisorPersona
+          : null;
       if (!recWarningEmitted) {
         // Check the FIRST payload once per run for rec-data presence. The T4
         // ticket confirms it's absent in the current payload shape; emit the
@@ -348,6 +358,7 @@ export async function aggregateMetrics(
         storeId,
         advisorName,
         r.advisorTekionId,
+        advisorPersona,
         advisorCache,
       );
       advisorsTouched.add(advisorId);

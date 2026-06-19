@@ -151,6 +151,10 @@ model Advisor {
   nameRaw        String?
 
   tekionUserId String?
+  // Tekion userRoleDetails.primaryRole.persona (SERVICE_ADVISOR, SERVICE_MANAGER,
+  // WARRANTY_CLERK, CASHIER, TECHNICIAN, ...). NULL for email-sourced advisors
+  // (SCVW/ARSJ) and any API advisor not yet resolved.
+  persona String?
 
   dailyMetrics   AdvisorDailyMetrics[]
   dailyCommodity AdvisorDailyCommodity[]

@@ -99,6 +99,7 @@ export class TekionClient {
   private tokenCache: CachedToken | null = null;
   private inFlightToken: Promise<string> | null = null;
   private readonly userNameCache = new Map<string, string | null>();
+  private readonly userPersonaCache = new Map<string, string | null>();
 
   constructor(config?: Partial<TekionClientConfig>) {
     const env = readConfigFromEnv();
@@ -364,10 +365,14 @@ export class TekionClient {
   async resolveUserDetailed(
     dealerId: string,
     userId: string,
-  ): Promise<{ name: string | null; sourceField: string | null; raw?: unknown }> {
-    if (!userId) return { name: null, sourceField: null };
+  ): Promise<{ name: string | null; persona: string | null; sourceField: string | null; raw?: unknown }> {
+    if (!userId) return { name: null, persona: null, sourceField: null };
     if (this.userNameCache.has(userId)) {
-      return { name: this.userNameCache.get(userId) ?? null, sourceField: null };
+      return {
+        name: this.userNameCache.get(userId) ?? null,
+        persona: this.userPersonaCache.get(userId) ?? null,
+        sourceField: null,
+      };
     }
     let raw: unknown;
     try {
@@ -389,14 +394,17 @@ export class TekionClient {
           (err.status === 400 && /no\.user\.found/i.test(body));
         if (notFound) {
           this.userNameCache.set(userId, null);
-          return { name: null, sourceField: null };
+          this.userPersonaCache.set(userId, null);
+          return { name: null, persona: null, sourceField: null };
         }
       }
       throw err;
     }
     const { name, sourceField } = extractUserDisplayName(raw);
+    const persona = extractUserPersona(raw);
     this.userNameCache.set(userId, name);
-    return { name, sourceField, raw };
+    this.userPersonaCache.set(userId, persona);
+    return { name, persona, sourceField, raw };
   }
 }
 
@@ -476,4 +484,33 @@ export function extractUserDisplayName(raw: unknown): {
     }
   }
   return { name: null, sourceField: null };
+}
+
+/**
+ * Pluck the persona out of the userservice response. The public OpenAPI shape
+ * is data.userRoleDetails.primaryRole.persona (e.g. "SERVICE_ADVISOR",
+ * "SERVICE_MANAGER", "WARRANTY_CLERK", "CASHIER", "TECHNICIAN"). Defensive: the
+ * data block may be grouped under `data` or ungrouped at the root.
+ */
+export function extractUserPersona(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const root = raw as Record<string, unknown>;
+  const candidates: Record<string, unknown>[] = [];
+  if (root.data && typeof root.data === "object")
+    candidates.push(root.data as Record<string, unknown>);
+  candidates.push(root);
+
+  for (const obj of candidates) {
+    const urd = obj.userRoleDetails;
+    if (urd && typeof urd === "object") {
+      const primary = (urd as Record<string, unknown>).primaryRole;
+      if (primary && typeof primary === "object") {
+        const persona = (primary as Record<string, unknown>).persona;
+        if (typeof persona === "string" && persona.trim()) {
+          return persona.trim();
+        }
+      }
+    }
+  }
+  return null;
 }

@@ -42,6 +42,28 @@ type DashboardResponse = {
   advisors: Array<{
     advisorId: string;
     advisorName: string;
+    persona?: string | null;
+    metrics: {
+      openRos: number;
+      menuCount: number;
+      menuLaborGross: number;
+      menuPartsGross: number;
+      alaCount: number;
+      alaLaborGross: number;
+      alaPartsGross: number;
+      recCount: number;
+      recSoldCount: number;
+      recAmount: number;
+      recSoldAmount: number;
+      dailyLaborGross: number;
+      dailyPartsGross: number;
+    };
+    commodities: Record<string, { qty: number; gross: number; laborGross: number }>;
+  }>;
+  others?: Array<{
+    advisorId: string;
+    advisorName: string;
+    persona?: string | null;
     metrics: {
       openRos: number;
       menuCount: number;
@@ -692,6 +714,26 @@ export default function DashboardClient({
         )}
       </div>
 
+      {(data?.others?.length ?? 0) > 0 && (
+        <div className="mt-8 space-y-3 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-sm font-semibold text-fg-strong">
+              Others (non-advisor roles)
+            </h3>
+            <span className="text-xs text-fg-muted">
+              RO assignees whose Tekion role is not Service Advisor — shown
+              separately so the advisor breakdown stays clean.
+            </span>
+          </div>
+          <DataTable
+            columns={othersColumns(fmtCount, fmtMoney, openAdvisor)}
+            rows={data?.others ?? []}
+            keyField={(a) => a.advisorId}
+            initialSort={{ key: "openRos", dir: "desc" }}
+          />
+        </div>
+      )}
+
       {selectedAdvisor && (
         <AdvisorDrawer
           advisorId={selectedAdvisor.id}
@@ -837,6 +879,88 @@ function fullPictureColumns(
 }
 
 type AdvisorRow = DashboardResponse["advisors"][number];
+type OtherRow = NonNullable<DashboardResponse["others"]>[number];
+
+/** Title-case a persona enum like "WARRANTY_CLERK" → "Warranty Clerk". */
+function formatPersona(p: string | null | undefined): string {
+  if (!p) return "—";
+  return p
+    .toLowerCase()
+    .split(/[_\s]+/)
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+/**
+ * Columns for the "Others" table (non-SERVICE_ADVISOR RO assignees). Compact:
+ * name + persona badge + the headline counts/gross. Same openAdvisor drill-in.
+ */
+function othersColumns(
+  fmtCount: (n: number) => string,
+  fmtMoney: (n: number) => string,
+  openAdvisor: (id: string, name: string) => void
+): Column<OtherRow>[] {
+  return [
+    {
+      key: "advisor",
+      header: "Name",
+      sortable: true,
+      sortValue: (a) => a.advisorName,
+      cell: (a) => (
+        <button
+          onClick={() => openAdvisor(a.advisorId, a.advisorName)}
+          className="font-medium text-fg-strong hover:text-accent transition-colors text-left"
+        >
+          {a.advisorName}
+        </button>
+      ),
+      sticky: true,
+    },
+    {
+      key: "persona",
+      header: "Role",
+      sortable: true,
+      sortValue: (a) => a.persona ?? "",
+      cell: (a) => (
+        <span className="inline-flex items-center rounded-full bg-bg-muted px-2 py-0.5 text-xs text-fg-muted">
+          {formatPersona(a.persona)}
+        </span>
+      ),
+    },
+    {
+      key: "openRos",
+      header: "Open ROs",
+      sortable: true,
+      sortValue: (a) => a.metrics.openRos,
+      cell: (a) => <span>{fmtCount(a.metrics.openRos)}</span>,
+    },
+    {
+      key: "menuCount",
+      header: "Menu",
+      sortable: true,
+      sortValue: (a) => a.metrics.menuCount,
+      cell: (a) => <span>{fmtCount(a.metrics.menuCount)}</span>,
+    },
+    {
+      key: "alaCount",
+      header: "ALA",
+      sortable: true,
+      sortValue: (a) => a.metrics.alaCount,
+      cell: (a) => <span>{fmtCount(a.metrics.alaCount)}</span>,
+    },
+    {
+      key: "gross",
+      header: "Daily Gross",
+      sortable: true,
+      sortValue: (a) => a.metrics.dailyLaborGross + a.metrics.dailyPartsGross,
+      cell: (a) => (
+        <span className="font-semibold text-fg-strong">
+          {fmtMoney(a.metrics.dailyLaborGross + a.metrics.dailyPartsGross)}
+        </span>
+      ),
+    },
+  ];
+}
 
 function advisorBreakdownColumns(
   kind: "menu" | "ala",

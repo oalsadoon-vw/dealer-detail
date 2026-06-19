@@ -26,8 +26,13 @@ const PLACEHOLDER_NAMES = new Set([
   "unassigned",
 ]);
 
+export interface ResolvedAdvisor {
+  name: string | null;
+  persona: string | null;
+}
+
 export interface AdvisorResolver {
-  resolve(advisorId: string): Promise<string | null>;
+  resolve(advisorId: string): Promise<ResolvedAdvisor>;
 }
 
 function titleCase(input: string): string {
@@ -55,7 +60,7 @@ export class ApiAdvisorResolver implements AdvisorResolver {
   private readonly client: TekionClient;
   private readonly seed: Map<string, string>;
   private warned403 = false;
-  private readonly cache = new Map<string, string | null>();
+  private readonly cache = new Map<string, ResolvedAdvisor>();
 
   constructor(cfg: ApiAdvisorResolverConfig) {
     if (!cfg.dealerId) {
@@ -66,20 +71,29 @@ export class ApiAdvisorResolver implements AdvisorResolver {
     this.seed = new Map(Object.entries(cfg.seed ?? {}));
   }
 
-  async resolve(advisorId: string): Promise<string | null> {
-    if (!advisorId) return null;
-    if (this.cache.has(advisorId)) return this.cache.get(advisorId) ?? null;
+  async resolve(advisorId: string): Promise<ResolvedAdvisor> {
+    if (!advisorId) return { name: null, persona: null };
+    const cached = this.cache.get(advisorId);
+    if (cached) return cached;
     const seeded = this.seed.get(advisorId);
     if (seeded) {
-      const n = normalizeName(seeded);
-      this.cache.set(advisorId, n);
-      return n;
+      // Seed only carries a name; persona is resolved lazily from the API on a
+      // future call if needed. Seed hits short-circuit to avoid an API call.
+      const r: ResolvedAdvisor = { name: normalizeName(seeded), persona: null };
+      this.cache.set(advisorId, r);
+      return r;
     }
     try {
-      const name = await this.client.resolveUser(this.dealerId, advisorId);
-      const n = normalizeName(name);
-      this.cache.set(advisorId, n);
-      return n;
+      const detail = await this.client.resolveUserDetailed(
+        this.dealerId,
+        advisorId,
+      );
+      const r: ResolvedAdvisor = {
+        name: normalizeName(detail.name),
+        persona: detail.persona ?? null,
+      };
+      this.cache.set(advisorId, r);
+      return r;
     } catch (err) {
       if (err instanceof TekionApiError && err.status === 403) {
         if (!this.warned403) {
@@ -88,8 +102,9 @@ export class ApiAdvisorResolver implements AdvisorResolver {
             "[tekion advisors] /users/{id} returned 403 — app API scope not granted for user lookups. Names will be null until Tekion re-grants scope.",
           );
         }
-        this.cache.set(advisorId, null);
-        return null;
+        const r: ResolvedAdvisor = { name: null, persona: null };
+        this.cache.set(advisorId, r);
+        return r;
       }
       throw err;
     }
@@ -161,7 +176,13 @@ export class BrowserAdvisorResolver implements AdvisorResolver {
 })()`;
   }
 
-  async resolve(advisorId: string): Promise<string | null> {
+  async resolve(advisorId: string): Promise<ResolvedAdvisor> {
+    // The browser/internal userservice path returns only a name, not persona.
+    const name = await this.resolveName(advisorId);
+    return { name, persona: null };
+  }
+
+  private async resolveName(advisorId: string): Promise<string | null> {
     if (!advisorId) return null;
     if (this.cache.has(advisorId)) return this.cache.get(advisorId) ?? null;
     const seeded = this.seed.get(advisorId);
@@ -287,9 +308,24 @@ export function getAdvisorResolver(
   return cachedResolver;
 }
 
+/**
+ * Back-compat helper that returns just the advisor display name. Prefer
+ * `getAdvisorResolver(opts).resolve(id)` for the full { name, persona }.
+ */
 export async function resolveAdvisorName(
   advisorId: string,
   opts?: GetAdvisorResolverOptions,
 ): Promise<string | null> {
+  const { name } = await getAdvisorResolver(opts).resolve(advisorId);
+  return name;
+}
+
+/**
+ * Resolve both the advisor display name and persona in one call.
+ */
+export async function resolveAdvisor(
+  advisorId: string,
+  opts?: GetAdvisorResolverOptions,
+): Promise<ResolvedAdvisor> {
   return getAdvisorResolver(opts).resolve(advisorId);
 }

@@ -26,7 +26,7 @@ import {
   TekionRateLimitError,
 } from "./client";
 import { getAdvisorResolver } from "./advisors";
-import type { AdvisorResolver, GetAdvisorResolverOptions } from "./advisors";
+import type { AdvisorResolver, GetAdvisorResolverOptions, ResolvedAdvisor } from "./advisors";
 import { reapStaleRuns } from "./reaper";
 import type {
   Job,
@@ -253,37 +253,40 @@ export async function collectRepairOrders(
   };
 
   // De-dupe advisor lookups + Advisor row upserts across concurrent ROs.
-  const advisorNamePromises = new Map<string, Promise<string | null>>();
+  const advisorResolvePromises = new Map<string, Promise<ResolvedAdvisor>>();
   const advisorUpsertPromises = new Map<string, Promise<string>>();
 
-  async function resolveAdvisorOnce(id: string): Promise<string | null> {
-    let p = advisorNamePromises.get(id);
+  async function resolveAdvisorOnce(id: string): Promise<ResolvedAdvisor> {
+    let p = advisorResolvePromises.get(id);
     if (!p) {
       p = (async () => {
         try {
-          const name = await resolver.resolve(id);
+          const resolved = await resolver.resolve(id);
           counters.apiCallCount += 1;
-          if (name) counters.advisorsResolved += 1;
-          return name;
+          if (resolved.name) counters.advisorsResolved += 1;
+          return resolved;
         } catch (err) {
           counters.warnings.push({
             documentId: null,
             message: `advisor resolution failed for id=${id}: ${(err as Error).message}`,
           });
-          return null;
+          return { name: null, persona: null };
         }
       })();
-      advisorNamePromises.set(id, p);
+      advisorResolvePromises.set(id, p);
     }
     return p;
   }
 
   async function ensureAdvisor(
     advisorTekionId: string | null,
-  ): Promise<{ name: string | null; nameNormalized: string }> {
+  ): Promise<{ name: string | null; persona: string | null; nameNormalized: string }> {
     let resolvedName: string | null = null;
+    let resolvedPersona: string | null = null;
     if (advisorTekionId) {
-      resolvedName = await resolveAdvisorOnce(advisorTekionId);
+      const resolved = await resolveAdvisorOnce(advisorTekionId);
+      resolvedName = resolved.name;
+      resolvedPersona = resolved.persona;
     }
     const { nameNormalized, nameRaw } = normalizeAdvisorKey(resolvedName);
     // Cache Advisor row upserts by the natural identity used in the DB unique
@@ -300,19 +303,21 @@ export async function collectRepairOrders(
             nameNormalized,
             nameRaw,
             tekionUserId: advisorTekionId,
+            persona: resolvedPersona,
           },
-          update: advisorTekionId
-            ? { tekionUserId: advisorTekionId, ...(nameRaw ? { nameRaw } : {}) }
-            : nameRaw
-              ? { nameRaw }
-              : {},
+          // Never clobber a known persona/tekionId/name with null.
+          update: {
+            ...(advisorTekionId ? { tekionUserId: advisorTekionId } : {}),
+            ...(nameRaw ? { nameRaw } : {}),
+            ...(resolvedPersona ? { persona: resolvedPersona } : {}),
+          },
         });
         return advisor.id;
       })();
       advisorUpsertPromises.set(key, p);
     }
     await p;
-    return { name: resolvedName, nameNormalized };
+    return { name: resolvedName, persona: resolvedPersona, nameNormalized };
   }
 
   async function fetchSnapshot(
@@ -419,6 +424,7 @@ export async function collectRepairOrders(
       const { snapshot, vehicle } = await fetchSnapshot(ro);
       const advisor = await ensureAdvisor(advisorTekionId);
       snapshot.advisorName = advisor.name;
+      snapshot.advisorPersona = advisor.persona;
 
       const vin = pickVin(ro) ?? vehicle?.vin ?? null;
       const openDate = epochToDate(ro.creationTime);

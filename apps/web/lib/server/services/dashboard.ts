@@ -45,6 +45,7 @@ export type DashboardParams =
 export type DashboardAdvisor = {
   advisorId: string;
   advisorName: string;
+  persona: string | null;
   metrics: {
     openRos: number;
     menuCount: number;
@@ -82,6 +83,14 @@ export type DashboardData = {
   };
   commodityKeys: string[];
   advisors: DashboardAdvisor[];
+  /**
+   * Non-service-advisor RO assignees (warranty clerks, cashiers, service
+   * managers, technicians, etc.). Same shape + metrics as `advisors`, split out
+   * so the advisor performance table shows only true SERVICE_ADVISOR personas.
+   * Empty for email-sourced stores (no persona data) and for API stores until a
+   * sync resolves personas.
+   */
+  others: DashboardAdvisor[];
   dailySeries: Array<{
     date: string;
     openRos: number;
@@ -371,7 +380,7 @@ export async function loadDashboardData(
 
     const byAdvisor: Record<
       string,
-      { advisorId: string; advisorName: string; metrics: typeof EMPTY_METRICS }
+      { advisorId: string; advisorName: string; persona: string | null; metrics: typeof EMPTY_METRICS }
     > = {};
 
     for (const m of metrics) {
@@ -379,6 +388,7 @@ export async function loadDashboardData(
       byAdvisor[key] = byAdvisor[key] ?? {
         advisorId: m.advisorId,
         advisorName: m.advisor.nameNormalized,
+        persona: (m.advisor as { persona?: string | null }).persona ?? null,
         metrics: { ...EMPTY_METRICS },
       };
       const t = byAdvisor[key].metrics;
@@ -404,16 +414,30 @@ export async function loadDashboardData(
       byAdvisor[advisorId] = {
         advisorId,
         advisorName: anyComm?.advisor?.nameNormalized ?? advisorId,
+        persona:
+          (anyComm?.advisor as { persona?: string | null } | undefined)?.persona ?? null,
         metrics: { ...EMPTY_METRICS },
       };
     }
 
-    const advisors: DashboardAdvisor[] = Object.values(byAdvisor)
+    const allAdvisors: DashboardAdvisor[] = Object.values(byAdvisor)
       .map((a) => ({
         ...a,
         commodities: commoditiesByAdvisor[a.advisorId] ?? {},
       }))
       .sort((a, b) => a.advisorName.localeCompare(b.advisorName));
+
+    // Partition by persona. Only MOVE rows whose persona is an explicit,
+    // non-SERVICE_ADVISOR value into "Others" — null persona (email-sourced
+    // stores, or not-yet-resolved API advisors) STAYS in the main advisor list
+    // so the SCVW/ARSJ dashboards keep every advisor.
+    const isOther = (p: string | null) => p != null && p !== "SERVICE_ADVISOR";
+    const advisors: DashboardAdvisor[] = allAdvisors.filter(
+      (a) => !isOther(a.persona),
+    );
+    const others: DashboardAdvisor[] = allAdvisors.filter((a) =>
+      isOther(a.persona),
+    );
 
     const commodityByDate = new Map<
       string,
@@ -465,6 +489,7 @@ export async function loadDashboardData(
         : null,
       commodityKeys,
       advisors,
+      others,
       dailySeries,
       commodityMix: (commodityMix as any[])
         .map((r: any) => ({

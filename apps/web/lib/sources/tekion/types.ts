@@ -114,6 +114,7 @@ export interface RepairOrderSnapshot {
     }>;
   }>;
   advisorName: string | null;
+  advisorPersona?: string | null;
 }
 
 export type FilterOperator = "GT" | "GTE" | "LT" | "LTE" | "IN" | "NIN" | "BTW" | "BOOL";
