@@ -18,6 +18,9 @@ type Category = "MENU" | "ALA" | "REC" | "COMMODITY";
 type Seed = { opcode: string; category: Category; commodityKey?: string | null };
 
 // Explicit MENU codes (Toyota factory-scheduled maintenance menus).
+// NOTE: factory TEK menu packages (TEK15000BNM etc.) are handled by the
+// brand-agnostic pattern fallback in opcodeClassifier.ts — do not list the
+// 212 TEK*NM codes here.
 const MENU_EXPLICIT: string[] = [
   "TSC10",
   "TSC5",
@@ -30,11 +33,14 @@ const MENU_EXPLICIT: string[] = [
   "TXMBASIC",
   "TXMPLUS",
   "TXM35KMIRAI",
+  "TXM10KMIRAI",
+  "TXM15K86",
   "TAC30",
   "TAC35",
   "TAC40",
   "TAC45",
   "TAC50",
+  "TAC55",
   "TAC60",
   "TAC70",
 ];
@@ -43,15 +49,20 @@ const MENU_EXPLICIT: string[] = [
 const COMMODITY_EXPLICIT: Array<{ opcode: string; commodityKey: string }> = [
   { opcode: "ROTATE", commodityKey: "tires" },
   { opcode: "ROTATE00RBA", commodityKey: "tires" },
+  { opcode: "1TIRE", commodityKey: "tires" },
+  { opcode: "2TIRE", commodityKey: "tires" },
   { opcode: "4TIRE", commodityKey: "tires" },
+  { opcode: "FLAT", commodityKey: "tires" },
   { opcode: "TPMS", commodityKey: "tires" },
   { opcode: "ALIGN", commodityKey: "alignment" },
   { opcode: "FACBRAKE", commodityKey: "brakes" },
+  { opcode: "ADBRAKE", commodityKey: "brakes" },
   { opcode: "BATT", commodityKey: "battery" },
   { opcode: "WIPER", commodityKey: "wipers" },
 ];
 
 // Explicit ALA codes (à la carte customer-pay non-menu service ops).
+// BG* = BG Products add-on services (fluid exchanges etc.) — customer-pay ALA.
 const ALA_EXPLICIT: string[] = [
   "VAC",
   "MPVI",
@@ -61,6 +72,16 @@ const ALA_EXPLICIT: string[] = [
   "LOF",
   "AIR",
   "UCMPVI",
+  "BATTDIAG",
+  "BGCVTF",
+  "BGATFX",
+  "BGBFX",
+  "BGCFX",
+  "BGBAT",
+  "BGRDIFF",
+  "BFXP",
+  "RACF",
+  "RAF",
 ];
 
 function buildSeeds(): Seed[] {

@@ -30,6 +30,22 @@ export async function ingestFiles(params: {
   const { storeId, businessDate, files } = params;
   const bizDate = parseBusinessDate(businessDate);
 
+  // API-enabled stores are fed by the Tekion API pipeline (collector +
+  // aggregator, which DELETE-then-INSERTs its dates). Email/Excel ingest
+  // uses INCREMENT semantics on the same metric tables, so letting both
+  // paths write the same store double-counts. Refuse loudly.
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { apiSyncEnabled: true, abbreviation: true },
+  });
+  if (store?.apiSyncEnabled) {
+    throw new Error(
+      `Store ${store.abbreviation ?? storeId} is on the Tekion API sync path — ` +
+        "email/file ingest is disabled for it to prevent double-counting. " +
+        "Disable apiSyncEnabled on the store to re-enable file ingest.",
+    );
+  }
+
   let run: { id: string; batchNo: number; storeId: string; businessDate: Date } | null = null;
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
