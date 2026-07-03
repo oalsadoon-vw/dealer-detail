@@ -24,6 +24,24 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * Does this per-store failure look like a token/auth blip worth one more try?
+ * Matches the exact nightly failure ('Token request failed: HTTP 400') plus
+ * generic auth-ish failures (401/403, 'unauthorized', token/auth mentions).
+ */
+export function isTokenAuthError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("token request failed") ||
+    m.includes("token response") ||
+    m.includes("unauthorized") ||
+    m.includes("forbidden") ||
+    /\btoken\b/.test(m) ||
+    /\bauth\w*/.test(m) ||
+    /http 40[13]\b/.test(m)
+  );
+}
+
 async function main() {
   const windowDays = (() => {
     const n = Number(process.env.SYNC_WINDOW_DAYS);
@@ -63,6 +81,7 @@ async function main() {
     metricsRowsWritten?: number;
     rateLimited?: boolean;
     error?: string;
+    retried?: boolean;
   }> = [];
 
   for (let i = 0; i < stores.length; i++) {
@@ -87,17 +106,66 @@ async function main() {
     }
   }
 
+  // ---- Second-chance pass ----------------------------------------------
+  // Stores that failed with a token/auth error get exactly ONE more attempt
+  // after a cooldown. The 2026-07 nightly run lost 3/7 stores to a transient
+  // 'Token request failed: HTTP 400' that self-healed — one retry pass would
+  // have saved all three. Same per-store try/catch: a store that fails again
+  // stays FAIL and never blocks the others.
+  const secondChance = results.filter(
+    (r) => !r.ok && r.error !== undefined && isTokenAuthError(r.error),
+  );
+  if (secondChance.length > 0) {
+    console.log(
+      `\nsecond-chance pass: ${secondChance.length} store(s) failed with token/auth errors: ` +
+        secondChance.map((r) => r.abbrev).join(", "),
+    );
+    for (let i = 0; i < secondChance.length; i++) {
+      const entry = secondChance[i];
+      if (cooldownSeconds > 0) {
+        console.log(`cooldown ${cooldownSeconds}s before retrying ${entry.abbrev}...`);
+        await sleep(cooldownSeconds * 1000);
+      }
+      console.log(`retrying ${entry.abbrev} (second chance)...`);
+      entry.retried = true;
+      try {
+        const r = await syncStore(entry.abbrev, windowDays);
+        entry.ok = true;
+        entry.error = undefined;
+        entry.rosFetched = r.rosFetched;
+        entry.metricsRowsWritten = r.metricsRowsWritten;
+        entry.rateLimited = r.rateLimited;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`${entry.abbrev} FAILED AGAIN (second chance): ${msg}`);
+        entry.error = msg;
+      }
+    }
+  }
+
   console.log("\n=== SYNC-ALL SUMMARY ===");
   for (const r of results) {
+    const retryTag = r.retried
+      ? r.ok
+        ? "  (recovered on second-chance retry)"
+        : "  (failed second-chance retry too)"
+      : "";
     if (r.ok) {
       console.log(
-        `  ${r.abbrev.padEnd(5)} OK    ros=${r.rosFetched} metricsRows=${r.metricsRowsWritten}${r.rateLimited ? "  (rate-limited, partial)" : ""}`,
+        `  ${r.abbrev.padEnd(5)} OK    ros=${r.rosFetched} metricsRows=${r.metricsRowsWritten}${r.rateLimited ? "  (rate-limited, partial)" : ""}${retryTag}`,
       );
     } else {
-      console.log(`  ${r.abbrev.padEnd(5)} FAIL  ${r.error}`);
+      console.log(`  ${r.abbrev.padEnd(5)} FAIL  ${r.error}${retryTag}`);
     }
   }
   const failures = results.filter((r) => !r.ok);
+  const retriedCount = results.filter((r) => r.retried).length;
+  if (retriedCount > 0) {
+    const recovered = results.filter((r) => r.retried && r.ok).length;
+    console.log(
+      `=== second-chance retries: ${retriedCount} attempted, ${recovered} recovered ===`,
+    );
+  }
   console.log(`=== ${results.length - failures.length}/${results.length} stores OK ===`);
   if (failures.length > 0) process.exitCode = 1;
 }
