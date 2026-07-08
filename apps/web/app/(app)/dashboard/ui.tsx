@@ -489,7 +489,7 @@ export default function DashboardClient({
             <div className="space-y-6 min-w-0">
               <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                 <Stat
-                  label="Open ROs"
+                  label="RO Count"
                   value={fmtCount(totals.openRosTotal)}
                   spark={sparkOpenRos.length > 1 ? { data: sparkOpenRos } : undefined}
                 />
@@ -547,7 +547,7 @@ export default function DashboardClient({
               <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
                 <Card>
                   <AreaChart
-                    title="Open ROs Trend"
+                    title="RO Count Trend"
                     data={series.map((d) => ({ label: d.date.slice(5), value: d.openRos }))}
                     color="rgb(var(--accent))"
                   />
@@ -777,7 +777,7 @@ function fullPictureColumns(
     },
     {
       key: "open_ros",
-      header: "Open ROs",
+      header: "RO Count",
       sortable: true,
       sortValue: (r) => r.a.metrics.openRos,
       cell: (r) => fmtCount(r.a.metrics.openRos),
@@ -929,7 +929,7 @@ function othersColumns(
     },
     {
       key: "openRos",
-      header: "Open ROs",
+      header: "RO Count",
       sortable: true,
       sortValue: (a) => a.metrics.openRos,
       cell: (a) => <span>{fmtCount(a.metrics.openRos)}</span>,

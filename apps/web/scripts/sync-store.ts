@@ -75,7 +75,16 @@ export async function syncStore(abbrev: string, windowDays: number): Promise<{
 
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
-  console.log(`\n=== sync ${abbrev} (“${store.name}”, dealer ${store.tekionDealerId}) window=${windowDays}d ===`);
+  // Window on modifiedTime, not creationTime: an RO that closes days after it
+  // was written gets modified at close, so a modifiedTime window re-captures it
+  // and un-freezes its status/closeDate. creationTime windows silently freeze
+  // any RO that outlives the window (hundreds of phantom "open" ROs per store).
+  const dateField =
+    (process.env.SYNC_DATE_FIELD as "creationTime" | "modifiedTime" | undefined) ??
+    "modifiedTime";
+  console.log(
+    `\n=== sync ${abbrev} (“${store.name}”, dealer ${store.tekionDealerId}) window=${windowDays}d field=${dateField} ===`,
+  );
 
   let rateLimited = false;
   let collectResult: Awaited<ReturnType<typeof collectRepairOrders>> | null = null;
@@ -86,6 +95,7 @@ export async function syncStore(abbrev: string, windowDays: number): Promise<{
       windowStart,
       windowEnd: now,
       kind: "MANUAL",
+      dateField,
       advisorResolverOptions: { seed: loadAdvisorSeed(abbrev) },
     });
     console.log(
@@ -102,6 +112,9 @@ export async function syncStore(abbrev: string, windowDays: number): Promise<{
 
   let aggregateBusinessDates: Date[] | undefined;
   if (collectResult) {
+    // Re-aggregate exactly the businessDates this run touched (including OLD
+    // dates a re-captured RO moved OUT of), plus the window itself as a safety
+    // net for legacy rows.
     const touched = await prisma.rawRepairOrder.findMany({
       where: {
         storeId: store.id,
@@ -110,7 +123,10 @@ export async function syncStore(abbrev: string, windowDays: number): Promise<{
       select: { businessDate: true },
       distinct: ["businessDate"],
     });
-    aggregateBusinessDates = touched.map((r) => r.businessDate);
+    const merged = new Map<number, Date>();
+    for (const r of touched) merged.set(r.businessDate.getTime(), r.businessDate);
+    for (const d of collectResult.touchedBusinessDates ?? []) merged.set(d.getTime(), d);
+    aggregateBusinessDates = Array.from(merged.values());
   }
   const agg = await aggregateMetrics({
     storeId: store.id,
