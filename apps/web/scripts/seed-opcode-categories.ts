@@ -17,11 +17,13 @@ import { prisma } from "../lib/db";
 type Category = "MENU" | "ALA" | "REC" | "COMMODITY";
 type Seed = { opcode: string; category: Category; commodityKey?: string | null };
 
-// Explicit MENU codes (Toyota factory-scheduled maintenance menus).
-// NOTE: factory TEK menu packages (TEK15000BNM etc.) are handled by the
-// brand-agnostic pattern fallback in opcodeClassifier.ts — do not list the
-// 212 TEK*NM codes here.
-const MENU_EXPLICIT: string[] = [
+// PREPAID maintenance (factory prepaid/contract plans: ToyotaCare TSC/TAC,
+// Toyota Xtra Care TXM, VW CareFree 10KCF/20KCF). These were previously seeded
+// as MENU, which inflated menu penetration ~15x vs the strict factory-menu
+// definition Joe's scorecards use (SERVICE_MENU opcodes only, 2026-07-08).
+// They now land in the commodity mix under their own "prepaid_maint" line so
+// nothing disappears from the dashboard.
+const PREPAID_EXPLICIT: string[] = [
   "TSC10",
   "TSC5",
   "TSCCONTRACT",
@@ -35,6 +37,7 @@ const MENU_EXPLICIT: string[] = [
   "TXM35KMIRAI",
   "TXM10KMIRAI",
   "TXM15K86",
+  "TAC10",
   "TAC30",
   "TAC35",
   "TAC40",
@@ -43,7 +46,38 @@ const MENU_EXPLICIT: string[] = [
   "TAC55",
   "TAC60",
   "TAC70",
+  "10KCF",
+  "20KCF",
 ];
+
+// Store-specific MENU overrides: genuine SERVICE_MENU opcodes (verified in
+// each store's Tekion opcode catalog) that do NOT match the TEK regex. Scoped
+// to the store because the names are generic enough to collide elsewhere.
+const MENU_STORE_SPECIFIC: Array<{ storeAbbrev: string; opcodes: string[] }> = [
+  {
+    storeAbbrev: "VWC",
+    opcodes: [
+      "INTER",
+      "INTERP",
+      "INTERV",
+      "MAJOR",
+      "MAJORP",
+      "MAJORV",
+      "MINOR",
+      "MINORP",
+      "MINORV",
+    ],
+  },
+  { storeAbbrev: "BST", opcodes: ["5KTEST"] },
+];
+// NOTE: factory TEK menu packages (TEK15000BNM etc.) are handled by the
+// brand-agnostic pattern fallback in opcodeClassifier.ts — do not list the
+// 212 TEK*NM codes here.
+//
+// MENU_EXPLICIT is now EMPTY by design: the strict definition (Joe, 2026-07-08)
+// is "menu = Tekion SERVICE_MENU opcodes only", which the TEK regex plus
+// MENU_STORE_SPECIFIC fully covers. Prepaid plans moved to PREPAID_EXPLICIT.
+const MENU_EXPLICIT: string[] = [];
 
 // Explicit COMMODITY codes -> commodity bucket.
 const COMMODITY_EXPLICIT: Array<{ opcode: string; commodityKey: string }> = [
@@ -88,6 +122,12 @@ function buildSeeds(): Seed[] {
   const seeds: Seed[] = [];
   for (const opcode of MENU_EXPLICIT) {
     seeds.push({ opcode, category: "MENU", commodityKey: null });
+  }
+  // Prepaid maintenance rides the COMMODITY category under its own key —
+  // no schema change, and it renders as a "prepaid_maint" line in the
+  // commodity mix instead of inflating menu penetration.
+  for (const opcode of PREPAID_EXPLICIT) {
+    seeds.push({ opcode, category: "COMMODITY", commodityKey: "prepaid_maint" });
   }
   for (const { opcode, commodityKey } of COMMODITY_EXPLICIT) {
     seeds.push({ opcode, category: "COMMODITY", commodityKey });
@@ -139,6 +179,43 @@ async function main() {
   const total = await prisma.opcodeCategory.count({ where: { storeId: null } });
   console.log(`done. inserted=${inserted} updated=${updated} unchanged=${seeds.length - inserted - updated}`);
   console.log(`Total global OpcodeCategory rows: ${total}`);
+
+  // Store-scoped MENU overrides (SERVICE_MENU opcodes that don't match the
+  // TEK regex — verified per-store in the Tekion opcode catalogs).
+  let storeInserted = 0;
+  let storeUpdated = 0;
+  for (const { storeAbbrev, opcodes } of MENU_STORE_SPECIFIC) {
+    const store = await prisma.store.findFirst({
+      where: { abbreviation: storeAbbrev },
+      select: { id: true },
+    });
+    if (!store) {
+      console.warn(`  WARN: store ${storeAbbrev} not found — skipping its MENU overrides`);
+      continue;
+    }
+    for (const raw of opcodes) {
+      const opcode = raw.toUpperCase().trim();
+      const existing = await prisma.opcodeCategory.findFirst({
+        where: { storeId: store.id, opcode },
+        select: { id: true, category: true, commodityKey: true },
+      });
+      if (existing) {
+        if (existing.category !== "MENU" || existing.commodityKey !== null) {
+          await prisma.opcodeCategory.update({
+            where: { id: existing.id },
+            data: { category: "MENU", commodityKey: null },
+          });
+          storeUpdated += 1;
+        }
+      } else {
+        await prisma.opcodeCategory.create({
+          data: { storeId: store.id, opcode, category: "MENU", commodityKey: null },
+        });
+        storeInserted += 1;
+      }
+    }
+  }
+  console.log(`store-scoped MENU overrides: inserted=${storeInserted} updated=${storeUpdated}`);
 
   const byCategory = await prisma.opcodeCategory.groupBy({
     where: { storeId: null },
