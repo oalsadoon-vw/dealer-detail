@@ -430,8 +430,13 @@ export async function loadDashboardData(
     // Partition by persona. Only MOVE rows whose persona is an explicit,
     // non-SERVICE_ADVISOR value into "Others" — null persona (email-sourced
     // stores, or not-yet-resolved API advisors) STAYS in the main advisor list
-    // so the SCVW/ARSJ dashboards keep every advisor.
-    const isOther = (p: string | null) => p != null && p !== "SERVICE_ADVISOR";
+    // so the SCVW/ARSJ dashboards keep every advisor. EXCEPTION: GM stores
+    // (e.g. BC) tag real, working service advisors with the generic Tekion
+    // "EMPLOYEE" persona instead of "SERVICE_ADVISOR" — verified 2026-08-11
+    // (5 BC advisors, 24-40 days of metrics each), so EMPLOYEE also stays in
+    // the main list rather than being bucketed into "Others".
+    const isOther = (p: string | null) =>
+      p != null && p !== "SERVICE_ADVISOR" && p !== "EMPLOYEE";
     const advisors: DashboardAdvisor[] = allAdvisors.filter(
       (a) => !isOther(a.persona),
     );

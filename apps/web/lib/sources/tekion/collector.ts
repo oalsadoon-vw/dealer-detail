@@ -80,6 +80,8 @@ export interface CollectResult {
   advisorsResolved: number;
   apiCallCount: number;
   warnings: CollectWarning[];
+  /** Every businessDate written or moved this run — re-aggregate exactly these. */
+  touchedBusinessDates: Date[];
 }
 
 const DEFAULT_CONCURRENCY = 5;
@@ -119,8 +121,30 @@ function pickVin(ro: RepairOrder): string | null {
   return typeof v?.vin === "string" && v.vin ? v.vin : null;
 }
 
+/** Statuses that mean the RO is finished (closed or invoiced). */
+const TERMINAL_STATUSES = new Set(["CLOSED", "INVOICED"]);
+
+/**
+ * Derive the close timestamp for an RO.
+ *
+ * The repair-orders:search payload carries closedTime/invoicedTime fields but
+ * Tekion returns them null/0 in practice. For a terminal-status RO the
+ * modifiedTime IS the close event (verified against Tekion UI 2026-07-01), so
+ * fall back to it. Non-terminal ROs have no close date.
+ */
+export function deriveCloseTime(ro: RepairOrder): number | null {
+  const explicit = ro.closedTime ?? ro.invoicedTime ?? null;
+  if (typeof explicit === "number" && explicit > 0) return explicit;
+  const status = (ro.status ?? "").toUpperCase();
+  if (TERMINAL_STATUSES.has(status)) {
+    const m = ro.modifiedTime;
+    if (typeof m === "number" && m > 0) return m;
+  }
+  return null;
+}
+
 function deriveBusinessDate(ro: RepairOrder): Date {
-  const closed = ro.closedTime ?? ro.invoicedTime ?? null;
+  const closed = deriveCloseTime(ro);
   const open = ro.creationTime ?? null;
   const base = closed ?? open ?? Date.now();
   return toBusinessDateUtc(new Date(base));
@@ -163,6 +187,8 @@ interface InternalCounters {
   advisorsResolved: number;
   rosFetched: number;
   warnings: CollectWarning[];
+  /** ISO strings of every businessDate written/moved this run (for re-aggregation). */
+  touchedBusinessDates: Set<string>;
 }
 
 /**
@@ -250,6 +276,7 @@ export async function collectRepairOrders(
     advisorsResolved: 0,
     rosFetched: 0,
     warnings: [],
+    touchedBusinessDates: new Set<string>(),
   };
 
   // De-dupe advisor lookups + Advisor row upserts across concurrent ROs.
@@ -428,18 +455,24 @@ export async function collectRepairOrders(
 
       const vin = pickVin(ro) ?? vehicle?.vin ?? null;
       const openDate = epochToDate(ro.creationTime);
-      const closeDate =
-        epochToDate(ro.closedTime) ?? epochToDate(ro.invoicedTime);
+      const closeDate = epochToDate(deriveCloseTime(ro));
       const businessDate = deriveBusinessDate(ro);
       const payload = snapshot as unknown as Record<string, unknown>;
       const contentHash = sha256Hex(stableJsonStringify(payload));
 
       const existing = await prisma.rawRepairOrder.findUnique({
         where: { storeId_documentId: { storeId, documentId } },
-        select: { id: true, contentHash: true },
+        select: { id: true, contentHash: true, closeDate: true, businessDate: true },
       });
 
       const now = new Date();
+      // Track every businessDate this RO touches so the caller can re-aggregate
+      // them. When a row MOVES buckets (created one day, closed a later day) the
+      // OLD date must be recomputed too, or the RO double-counts.
+      counters.touchedBusinessDates.add(businessDate.toISOString());
+      if (existing && existing.businessDate.getTime() !== businessDate.getTime()) {
+        counters.touchedBusinessDates.add(existing.businessDate.toISOString());
+      }
       if (!existing) {
         await prisma.rawRepairOrder.create({
           data: {
@@ -477,6 +510,17 @@ export async function collectRepairOrders(
             contentHash,
             fetchedAt: now,
           },
+        });
+        counters.updated += 1;
+      } else if (
+        (closeDate && !existing.closeDate) ||
+        existing.businessDate.getTime() !== businessDate.getTime()
+      ) {
+        // Payload unchanged but our DERIVED columns are stale (legacy rows
+        // written before closeDate fell back to modifiedTime). Light repair.
+        await prisma.rawRepairOrder.update({
+          where: { id: existing.id },
+          data: { status: ro.status ?? null, closeDate, businessDate, fetchedAt: now },
         });
         counters.updated += 1;
       } else {
@@ -622,6 +666,9 @@ export async function collectRepairOrders(
       advisorsResolved: counters.advisorsResolved,
       apiCallCount: counters.apiCallCount,
       warnings: counters.warnings,
+      touchedBusinessDates: Array.from(counters.touchedBusinessDates)
+        .sort()
+        .map((s) => new Date(s)),
     };
   } finally {
     for (const [sig, handler] of Object.entries(signalHandlers)) {

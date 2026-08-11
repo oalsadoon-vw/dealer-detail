@@ -14,7 +14,14 @@ import "server-only";
  * Content-Type: application/json.
  */
 
-import { TokenBucket, tekionLimiter, backoffMs, sleep } from "./throttle";
+import {
+  TokenBucket,
+  tekionLimiter,
+  backoffMs,
+  sleep,
+  retryWithBackoff,
+  TOKEN_RETRY_DELAYS_MS,
+} from "./throttle";
 import type {
   Job,
   Operation,
@@ -60,6 +67,25 @@ export interface TekionClientConfig {
   secretKey: string;
   limiter?: TokenBucket;
   fetchImpl?: typeof fetch;
+  /**
+   * Backoff schedule for retrying the OAuth token fetch on transient failures
+   * (HTTP 4xx/5xx from the token endpoint, network errors). Defaults to
+   * TOKEN_RETRY_DELAYS_MS (5s/15s/45s). Override in tests to avoid real waits.
+   */
+  tokenRetryDelaysMs?: readonly number[];
+}
+
+/**
+ * Should a failed token fetch be retried? Transient = any HTTP 4xx/5xx from
+ * the token endpoint (the 2026-07 nightly outage returned HTTP 400 that
+ * self-healed within hours) or a network-level error (fetch rejection).
+ * NOT retried: malformed/`status != success` 2xx responses — those indicate a
+ * contract change, and retrying won't fix them.
+ */
+export function isTransientTokenError(err: unknown): boolean {
+  if (err instanceof TekionApiError) return err.status >= 400;
+  // fetch() rejections (DNS, connection reset, timeout) are transient.
+  return true;
 }
 
 export interface SearchRepairOrdersInput {
@@ -96,6 +122,7 @@ export class TekionClient {
   private readonly secretKey: string;
   private readonly limiter: TokenBucket;
   private readonly fetchImpl: typeof fetch;
+  private readonly tokenRetryDelaysMs: readonly number[];
   private tokenCache: CachedToken | null = null;
   private inFlightToken: Promise<string> | null = null;
   private readonly userNameCache = new Map<string, string | null>();
@@ -108,6 +135,8 @@ export class TekionClient {
     this.secretKey = config?.secretKey ?? env.secretKey;
     this.limiter = config?.limiter ?? tekionLimiter;
     this.fetchImpl = config?.fetchImpl ?? fetch;
+    this.tokenRetryDelaysMs =
+      config?.tokenRetryDelaysMs ?? TOKEN_RETRY_DELAYS_MS;
   }
 
   // ---------- token ----------
@@ -122,7 +151,20 @@ export class TekionClient {
       return this.tokenCache.accessToken;
     }
     if (this.inFlightToken) return this.inFlightToken;
-    this.inFlightToken = this.fetchToken()
+    // Retry the token fetch on transient failures (HTTP 4xx/5xx on the token
+    // endpoint, network errors) with a 5s/15s/45s backoff. The 2026-07 nightly
+    // sync lost 3/7 stores to a transient 'Token request failed: HTTP 400'
+    // that resolved on its own — a fresh POST usually succeeds within seconds.
+    this.inFlightToken = retryWithBackoff(() => this.fetchToken(), {
+      delaysMs: this.tokenRetryDelaysMs,
+      shouldRetry: isTransientTokenError,
+      onRetry: (err, attempt, delayMs) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `TekionClient: token fetch failed (${msg}); retry ${attempt}/${this.tokenRetryDelaysMs.length} in ${Math.round(delayMs / 1000)}s`,
+        );
+      },
+    })
       .then((tok) => {
         this.tokenCache = tok;
         return tok.accessToken;

@@ -400,7 +400,7 @@ function BackgroundLayer() {
  * ═════════════════════════════════════════════════════ */
 
 const KPIS = [
-  { label: "Open ROs", value: "47", sub: "+5 vs last period", subClass: "text-emerald-600" },
+  { label: "RO Count", value: "47", sub: "+5 vs last period", subClass: "text-emerald-600" },
   { label: "Total Daily Gross", value: "$182K", sub: "+12.4%", subClass: "text-emerald-600" },
   { label: "Advisors Active", value: "6", sub: "All stores", subClass: "text-zinc-500" },
   { label: "Menu Sales %", value: "6.38%", sub: "3 Sold", subClass: "text-zinc-500" },
@@ -410,7 +410,7 @@ const KPIS = [
 
 const TRENDS = [
   {
-    title: "Open ROs Trend",
+    title: "RO Count Trend",
     colorClass: "text-indigo-500",
     fillClass: "fill-indigo-500/15",
     data: [12, 15, 14, 18, 17, 20, 19, 22, 21, 24, 23, 26, 25, 28],
@@ -603,7 +603,7 @@ function PreviewCard() {
  * ═════════════════════════════════════════════════════ */
 function MiniPreview() {
   const miniKpis = [
-    { label: "Open ROs", val: "47", colorClass: "text-indigo-600" },
+    { label: "RO Count", val: "47", colorClass: "text-indigo-600" },
     { label: "Gross", val: "$182K", colorClass: "text-emerald-600" },
     { label: "Menu %", val: "6.38%", colorClass: "text-amber-600" },
   ];

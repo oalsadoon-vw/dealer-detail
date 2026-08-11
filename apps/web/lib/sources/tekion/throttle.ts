@@ -74,3 +74,52 @@ export function backoffMs(attempt: number): number {
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+/**
+ * Default backoff schedule for the Tekion OAuth token endpoint: 3 retries
+ * (4 attempts total) at 5s / 15s / 45s. Chosen after the 2026-07 nightly sync
+ * lost 3/7 stores to a transient 'Token request failed: HTTP 400' that cleared
+ * on its own — a fixed, generous schedule rides out short-lived auth blips
+ * without burning meaningful rate budget (token calls are cheap).
+ */
+export const TOKEN_RETRY_DELAYS_MS: readonly number[] = [5_000, 15_000, 45_000];
+
+export interface RetryWithBackoffOptions {
+  /** Waits between attempts. Total attempts = delaysMs.length + 1. */
+  delaysMs?: readonly number[];
+  /** Return false to stop retrying and rethrow immediately. Default: always retry. */
+  shouldRetry?: (err: unknown, attempt: number) => boolean;
+  /** Called before each sleep; attempt is 1-based (the retry about to happen). */
+  onRetry?: (err: unknown, attempt: number, delayMs: number) => void;
+  /** Injectable sleep for tests. */
+  sleepImpl?: (ms: number) => Promise<void>;
+}
+
+/**
+ * Run `fn`, retrying on failure with a fixed backoff schedule.
+ * Rethrows the last error once the schedule is exhausted or `shouldRetry`
+ * returns false.
+ */
+export async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  opts: RetryWithBackoffOptions = {},
+): Promise<T> {
+  const delays = opts.delaysMs ?? TOKEN_RETRY_DELAYS_MS;
+  const shouldRetry = opts.shouldRetry ?? (() => true);
+  const doSleep = opts.sleepImpl ?? sleep;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const isLastAttempt = attempt >= delays.length;
+      if (isLastAttempt || !shouldRetry(err, attempt)) throw err;
+      const delayMs = delays[attempt];
+      opts.onRetry?.(err, attempt + 1, delayMs);
+      await doSleep(delayMs);
+    }
+  }
+  // Unreachable (loop always returns or throws), but satisfies the compiler.
+  throw lastErr;
+}

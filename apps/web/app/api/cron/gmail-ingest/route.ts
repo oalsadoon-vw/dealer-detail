@@ -230,6 +230,23 @@ export async function GET(req: Request) {
         const ingestResults: IngestResult[] = [];
         const storesMatched: string[] = [];
 
+        // Skip stores on the Tekion API sync path — their metrics come from
+        // the API collector/aggregator; file ingest would double-count (and
+        // ingestFiles refuses with a throw, which would wedge this message
+        // in an unprocessed loop). Skipping still marks the email ingested.
+        const apiStores = await prisma.store.findMany({
+          where: { id: { in: [...filesByStoreId.keys()] }, apiSyncEnabled: true },
+          select: { id: true, abbreviation: true },
+        });
+        for (const s of apiStores) {
+          const skipped = filesByStoreId.get(s.id);
+          filesByStoreId.delete(s.id);
+          console.log(
+            `[gmail-ingest] Skipping ${skipped?.length ?? 0} attachment(s) for API-synced store ` +
+              `${s.abbreviation ?? s.id} in message ${msg.id}.`
+          );
+        }
+
         for (const [storeId, files] of filesByStoreId) {
           storesMatched.push(storeId);
           const result = await ingestFiles({

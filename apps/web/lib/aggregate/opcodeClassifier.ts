@@ -43,9 +43,28 @@ export async function loadOpcodeCategories(storeId: string): Promise<OpcodeMap> 
 }
 
 /**
- * Look up a single opcode. Returns null when the opcode is unmapped — the
- * caller should count this as a warning (still include labor/parts in daily
- * totals so the store-wide gross stays whole).
+ * Brand-agnostic Tekion factory SERVICE_MENU opcode pattern.
+ *
+ * Tekion auto-generates menu-package opcodes as
+ *   TEK<mileage><B|P|V><N|S>M
+ * e.g. TEK15000BNM (15k basic/normal), TEK100000VNM (100k value/normal),
+ * TEK90000PSM (90k plus/severe). Verified identical across brands: the
+ * BC (Chevrolet) and TOL (Toyota) opcode catalogs each carry the same
+ * 212-opcode set with opcodeType=SERVICE_MENU. This pattern therefore
+ * classifies factory menus for EVERY store regardless of make.
+ *
+ * Deliberately narrow: TEK-prefixed individual factory services look like
+ * TEK07120301 (8-digit operation ids, no [BPV][NS]M suffix) and must NOT
+ * match — those are à-la-carte ops, not menu packages.
+ */
+const TEK_MENU_PATTERN = /^TEK\d{4,6}[BPV][NS]M$/;
+
+/**
+ * Look up a single opcode. DB mappings (store override > global) win;
+ * otherwise fall back to the brand-agnostic TEK menu pattern. Returns null
+ * when the opcode is unmapped — the caller should count this as a warning
+ * (still include labor/parts in daily totals so the store-wide gross stays
+ * whole).
  */
 export function classifyOpcode(
   map: OpcodeMap,
@@ -53,5 +72,10 @@ export function classifyOpcode(
 ): OpcodeMapping | null {
   const key = normalizeOpcode(opcode);
   if (!key) return null;
-  return map.get(key) ?? null;
+  const mapped = map.get(key);
+  if (mapped) return mapped;
+  if (TEK_MENU_PATTERN.test(key)) {
+    return { category: "MENU", commodityKey: null };
+  }
+  return null;
 }
