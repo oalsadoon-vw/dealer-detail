@@ -50,5 +50,22 @@ if [ -f "$PROBE" ]; then
 fi
 # -----------------------------------------------------------------------------
 
-npm run sync:all
-echo "===== $(date -Is) all-stores nightly sync DONE ====="
+# ---- HARD TIMEOUT GUARD -----------------------------------------------------
+# 2026-08-11: a stuck sync (Supabase pooler connection resets on one store)
+# was found still RUNNING 13+ hours after start, holding the flock lock the
+# ENTIRE time — every subsequent night's cron fire hit `flock -n` and silently
+# no-op'd (no log line at all), producing large silent gaps of stale data.
+# Cap the whole sync:all run at 45 minutes; `timeout` sends SIGTERM, which the
+# collector already handles gracefully (T3b signal-safe finalize + stale-run
+# reaper marks the SyncRun FAILED instead of leaving it orphaned RUNNING).
+# A killed run still leaves whatever it already wrote committed (idempotent
+# upserts) — never worse than not running at all, and never blocks tomorrow.
+set +e
+timeout -k 30 2700 npm run sync:all
+rc=$?
+set -e
+if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+  echo "===== $(date -Is) all-stores nightly sync TIMED OUT after 45m (rc=$rc) — killed, lock released ====="
+else
+  echo "===== $(date -Is) all-stores nightly sync DONE (rc=$rc) ====="
+fi
