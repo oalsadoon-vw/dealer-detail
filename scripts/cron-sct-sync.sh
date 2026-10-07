@@ -60,12 +60,29 @@ fi
 # reaper marks the SyncRun FAILED instead of leaving it orphaned RUNNING).
 # A killed run still leaves whatever it already wrote committed (idempotent
 # upserts) — never worse than not running at all, and never blocks tomorrow.
+#
+# 2026-09-01 CRITICAL FIX: the 45-minute (2700s) cap was SMALLER than the work
+# it had to contain, so it silently starved 4 of 7 stores for 19 consecutive
+# nights (SCT/SCVW/TOL/VWC last synced Aug 10-11 — the exact day this guard was
+# added). Arithmetic of the old cap:
+#     6 inter-store cooldowns x 240s = 24 min of pure sleep
+#     45 min cap - 24 min sleep      = 21 min of actual work for SEVEN stores
+#     BC alone routinely takes ~33 min
+# Result every single night: ARSJ ok -> BC ok -> BST killed mid-run -> SCT,
+# SCVW, TOL, VWC never reached at all. Because the store list is ordered
+# alphabetically, the SAME four stores lost every time.
+#
+# New budget: cron fires 23:00, the VI inventory pull starts 02:00 and shares
+# the app-wide Tekion quota, so we may use up to ~2h45m. Cap at 2h30m (9000s)
+# to finish ~01:30 with margin. Cooldown trimmed 240s->150s (saves 9 min) while
+# still pacing us well inside OVERALL_RATELIMIT.
+export SYNC_COOLDOWN_SECONDS="${SYNC_COOLDOWN_SECONDS:-150}"
 set +e
-timeout -k 30 2700 npm run sync:all
+timeout -k 30 9000 npm run sync:all
 rc=$?
 set -e
 if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
-  echo "===== $(date -Is) all-stores nightly sync TIMED OUT after 45m (rc=$rc) — killed, lock released ====="
+  echo "===== $(date -Is) all-stores nightly sync TIMED OUT after 150m (rc=$rc) — killed, lock released ====="
 else
   echo "===== $(date -Is) all-stores nightly sync DONE (rc=$rc) ====="
 fi
