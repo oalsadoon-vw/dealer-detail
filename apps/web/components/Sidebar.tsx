@@ -30,17 +30,6 @@ export type SidebarUser = {
   isPlatformAdmin?: boolean;
 };
 
-function IconUpload() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M12 3l4 4h-3v7h-2V7H8l4-4zm-7 14h14v2H5v-2z"
-      />
-    </svg>
-  );
-}
-
 function IconRuns() {
   return (
     <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
@@ -75,6 +64,46 @@ function IconFleet() {
   return (
     <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
       <path fill="currentColor" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z" />
+    </svg>
+  );
+}
+
+function IconAdvisors() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+      <path fill="currentColor" d="M12 12a4 4 0 100-8 4 4 0 000 8zm0 2c-3.3 0-8 1.7-8 4v2h16v-2c0-2.3-4.7-4-8-4z" />
+    </svg>
+  );
+}
+
+function IconMenu() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+      <path fill="currentColor" d="M4 4h16v2H4V4zm0 5h10v2H4V9zm0 5h16v2H4v-2zm0 5h10v2H4v-2z" />
+    </svg>
+  );
+}
+
+function IconParts() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+      <path fill="currentColor" d="M12 2l9 5v10l-9 5-9-5V7l9-5zm0 2.3L5 8.1v7.8l7 3.9 7-3.9V8.1l-7-3.8z" />
+    </svg>
+  );
+}
+
+function IconFinancials() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+      <path fill="currentColor" d="M11 2h2v2.1c1.9.3 3.4 1.5 3.6 3.4h-2.1c-.2-.9-1-1.5-2.5-1.5-1.6 0-2.4.7-2.4 1.6 0 .8.6 1.3 2.7 1.8 2.6.6 4.5 1.5 4.5 3.9 0 1.9-1.5 3.1-3.8 3.4V22h-2v-2.3c-2.1-.3-3.7-1.5-3.9-3.6h2.1c.2 1.1 1.1 1.7 2.7 1.7 1.7 0 2.6-.7 2.6-1.7 0-.9-.7-1.4-2.9-1.9C9.1 13.6 7.3 12.7 7.3 10.4c0-1.8 1.4-3 3.7-3.3V2z" />
+    </svg>
+  );
+}
+
+function IconSyncStatus() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+      <path fill="currentColor" d="M12 4a8 8 0 017.7 6h-2.1A6 6 0 006.3 9H9v2H3V5h2v2.5A8 8 0 0112 4zm8 9v6h-2v-2.5A8 8 0 014.3 14h2.1a6 6 0 0011.3 1H15v-2h5z" />
     </svg>
   );
 }
@@ -179,10 +208,12 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
 
   const items: NavItem[] = useMemo(
     () => [
-      { href: "/upload", label: "Upload", icon: <IconUpload /> },
-      { href: "/runs", label: "Runs", icon: <IconRuns /> },
-      { href: "/dashboard", label: "Dashboard", icon: <IconDashboard /> },
-      { href: "/reports", label: "Reports", icon: <IconReports /> },
+      { href: "/reports", label: "Overview", icon: <IconDashboard /> },
+      { href: "/reports/advisors", label: "Advisors", icon: <IconAdvisors /> },
+      { href: "/reports/menu", label: "Menu Sales", icon: <IconMenu /> },
+      { href: "/reports/opcodes", label: "Commodities", icon: <IconParts /> },
+      { href: "/reports/ros", label: "Repair Orders", icon: <IconRuns /> },
+      { href: "/reports/financials", label: "Financials", icon: <IconFinancials /> },
       { href: "/reports/fleet", label: "Fleet", icon: <IconFleet /> },
     ],
     []
@@ -195,6 +226,7 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
+    if (href === "/reports") return pathname === "/reports";
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
@@ -393,6 +425,22 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
                 Admin
               </div>
             )}
+            <Link
+              href="/sync"
+              className={cx(
+                "group relative flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
+                isActive("/sync")
+                  ? "bg-zinc-900 text-white"
+                  : "text-zinc-400 hover:bg-zinc-900/60 hover:text-zinc-100"
+              )}
+              title={isCollapsed ? "Sync Status" : undefined}
+            >
+              {isActive("/sync") && (
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full bg-accent" />
+              )}
+              <IconSyncStatus />
+              {!isCollapsed && <span>Sync Status</span>}
+            </Link>
             <Link
               href="/settings"
               className={cx(
