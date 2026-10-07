@@ -63,6 +63,22 @@ function IconDashboard() {
   );
 }
 
+function IconReports() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+      <path fill="currentColor" d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 13h2v-5H7v5zm4 0h2V7h-2v9zm4 0h2v-3h-2v3z" />
+    </svg>
+  );
+}
+
+function IconFleet() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" aria-hidden="true">
+      <path fill="currentColor" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z" />
+    </svg>
+  );
+}
+
 function IconSettings() {
   return (
     <svg
@@ -166,6 +182,8 @@ export default function Sidebar({ user }: { user?: SidebarUser }) {
       { href: "/upload", label: "Upload", icon: <IconUpload /> },
       { href: "/runs", label: "Runs", icon: <IconRuns /> },
       { href: "/dashboard", label: "Dashboard", icon: <IconDashboard /> },
+      { href: "/reports", label: "Reports", icon: <IconReports /> },
+      { href: "/reports/fleet", label: "Fleet", icon: <IconFleet /> },
     ],
     []
   );
