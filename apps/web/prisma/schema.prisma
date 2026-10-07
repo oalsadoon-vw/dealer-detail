@@ -138,6 +138,7 @@ model Store {
   opcodeCategories OpcodeCategory[]
   roFacts          RoFact[]
   roOpFacts        RoOpFact[]
+  glAccountDaily   GlAccountDaily[]
 
   @@unique([abbreviation])
   @@index([organizationId])
@@ -344,6 +345,39 @@ model AuditLog {
 // ---------------------------------------------------------------------------
 // Tekion OpenAPI pipeline (parallel to the email/Excel ingest)
 // ---------------------------------------------------------------------------
+
+/// Daily snapshot of the Tekion Financial-Statement engine, per GL account.
+/// Collected host-side (scripts/gl-snapshot.ts) from the internal
+/// financial-statements API — the same numbers printed on the OEM statement.
+/// mtd = month-to-date balance as of asOfDate (sales negative, cost positive,
+/// as Tekion stores them). Daily activity = mtd(d) - mtd(d-1).
+model GlAccountDaily {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  asOfDate      DateTime @db.Date
+  glAccountId   String   // e.g. "876_4400"
+  accountNumber String
+  accountName   String
+  accountType   String   // SALE | COST_OF_SALE | OPERATING_EXPENSE | ...
+  department    String?  // SERVICE | PARTS | VEHICLE_SALES | ...
+  fsGroup       String?  // FS cell group code, e.g. "_4400"
+  fsLine        String?  // FS line display name
+  fsPage        Int?
+
+  mtd      Float  // MTD balance as of asOfDate (Tekion sign)
+  ytd      Float
+  mtdCount Int    @default(0) // RO count where Tekion tracks one
+  daily    Float  // mtd(d) - mtd(prev business snapshot in same month)
+
+  @@unique([storeId, asOfDate, glAccountId])
+  @@index([storeId, asOfDate])
+  @@index([storeId, department, accountType])
+}
 
 model SyncRun {
   id        String   @id @default(uuid())

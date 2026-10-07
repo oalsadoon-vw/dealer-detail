@@ -22,6 +22,7 @@ const PAGES = [
   { href: "/reports/menu", label: "Menu Sales" },
   { href: "/reports/opcodes", label: "Opcodes & Commodities" },
   { href: "/reports/ros", label: "RO List" },
+  { href: "/reports/financials", label: "Financials" },
   { href: "/reports/fleet", label: "Fleet Rollup" },
 ];
 
@@ -31,6 +32,7 @@ function Inner({ stores, children }: { stores: StoreOpt[]; children: React.React
   const store = stores.find((s) => s.id === f.storeId);
   const brand = storeBrand(store?.abbreviation ?? null);
   const isFleet = pathname.startsWith("/reports/fleet");
+  const isFinancials = pathname.startsWith("/reports/financials");
 
   return (
     <Ctx.Provider value={{ f, stores }}>
@@ -38,7 +40,7 @@ function Inner({ stores, children }: { stores: StoreOpt[]; children: React.React
         <div className="flex items-start justify-between gap-4">
           <SectionHeading
             title={isFleet ? "Fleet Rollup" : (store?.name ?? "Reports")}
-            description="Live from the Tekion Open API — every number traces to a repair order."
+            description={isFinancials ? "Tekion financial statement — GL balances as posted, same source as the printed OEM statement." : "Live from the Tekion Open API — every number traces to a repair order."}
             size="page"
           />
           {!isFleet && store && (

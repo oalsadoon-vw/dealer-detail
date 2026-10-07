@@ -11,6 +11,7 @@ import {
   getRoList,
   getSummary,
 } from "@/lib/server/services/reports";
+import { getFinancials, getFinancialsFleet } from "@/lib/server/services/financials";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,8 @@ const Schemas = {
     limit: z.coerce.number().int().positive().max(5000).optional(),
   }),
   fleet: Base,
+  financials: StoreBase,
+  "financials-fleet": Base,
 } as const;
 
 type ReportKind = keyof typeof Schemas;
@@ -76,6 +79,8 @@ export const GET = withAuth<{ params: { report: string } }>(async (req, ctx, tc)
       case "lines":    data = await getOpcodeLines(tc, { ...q, opcodes: splitOps(q.opcodes) }); break;
       case "ros":      data = await getRoList(tc, q); break;
       case "fleet":    data = await getFleetRollup(tc, q); break;
+      case "financials": data = await getFinancials(tc, q); break;
+      case "financials-fleet": data = await getFinancialsFleet(tc, q); break;
     }
     return NextResponse.json(data, { headers: { "Cache-Control": "private, max-age=60" } });
   } catch (e) {

@@ -121,7 +121,7 @@ export default async function LandingPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) redirect("/dashboard");
+  if (user) redirect("/reports");
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-zinc-950 text-white antialiased">

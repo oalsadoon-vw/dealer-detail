@@ -15,6 +15,9 @@ type Row = {
   totalSale: number; totalGross: number; billHours: number; elr: number; hoursPerRo: number; salePerRo: number; menuRos: number; menuPenetration: number;
 };
 type Resp = { rows: Row[] };
+type FinDept = { sales: number; cost: number; gross: number; grossPct: number; roCount: number };
+type FinRow = { storeId: string; name: string; abbreviation: string | null; asOf: string | null; service: FinDept; parts: FinDept };
+type FinResp = { rows: FinRow[] };
 
 /**
  * "Fleet rollup" = all 7 AMG stores side by side for the same date range, plus
@@ -24,7 +27,11 @@ export default function FleetPage() {
   const { f } = useReportsCtx();
   const q = new URLSearchParams({ startDate: f.startDate, endDate: f.endDate, basis: f.basis }).toString();
   const { data, loading, error } = useReport<Resp>("fleet", q);
+  const finQ = new URLSearchParams({ startDate: f.startDate, endDate: f.endDate }).toString();
+  const fin = useReport<FinResp>("financials-fleet", finQ);
   const rows = (data?.rows ?? []).filter((r) => r.apiSyncEnabled || r.roCount > 0);
+  const finRows = (fin.data?.rows ?? []).filter((r) => r.service.sales || r.parts.sales);
+  const FT = finRows.reduce((t, r) => ({ ss: t.ss + r.service.sales, sg: t.sg + r.service.gross, ps: t.ps + r.parts.sales, pg: t.pg + r.parts.gross }), { ss: 0, sg: 0, ps: 0, pg: 0 });
 
   if (error) return <EmptyState title="Couldn't load fleet rollup" description={error} />;
   if (loading || !data) return <Skeleton className="h-96 w-full" />;
@@ -33,6 +40,18 @@ export default function FleetPage() {
     roCount: t.roCount + r.roCount, laborSale: t.laborSale + r.laborSale, partsSale: t.partsSale + r.partsSale, totalSale: t.totalSale + r.totalSale,
     totalGross: t.totalGross + r.totalGross, billHours: t.billHours + r.billHours, menuRos: t.menuRos + r.menuRos, cpRoCount: t.cpRoCount + r.cpRoCount,
   }), { roCount: 0, laborSale: 0, partsSale: 0, totalSale: 0, totalGross: 0, billHours: 0, menuRos: 0, cpRoCount: 0 });
+
+  const finCols: Column<FinRow>[] = [
+    { key: "name", header: "Store", cell: (r) => { const b = storeBrand(r.abbreviation); return <Link href={reportHref("/reports/financials", { ...f, storeId: r.storeId })} className="flex items-center gap-2 font-medium hover:underline"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: b.accent }} />{r.name}</Link>; }, sortable: true, sortValue: (r) => r.name, sticky: true },
+    { key: "asOf", header: "GL as of", cell: (r) => r.asOf ? <Badge tone="neutral" size="sm">{r.asOf.slice(5).replace("-", "/")}</Badge> : <Badge tone="danger" size="sm">none</Badge>, hideOnMobile: true },
+    { key: "sRos", header: "Svc ROs (MTD)", cell: (r) => fmtNum(r.service.roCount), sortable: true, sortValue: (r) => r.service.roCount, align: "right", hideOnMobile: true },
+    { key: "sSales", header: "Service sales", cell: (r) => fmtMoney(r.service.sales), sortable: true, sortValue: (r) => r.service.sales, align: "right" },
+    { key: "sGross", header: "Service gross", cell: (r) => <span className="font-medium">{fmtMoney(r.service.gross)}</span>, sortable: true, sortValue: (r) => r.service.gross, align: "right" },
+    { key: "sGp", header: "GP %", cell: (r) => fmtPct(r.service.grossPct, 1), sortable: true, sortValue: (r) => r.service.grossPct, align: "right", hideOnMobile: true },
+    { key: "pSales", header: "Parts sales", cell: (r) => fmtMoney(r.parts.sales), sortable: true, sortValue: (r) => r.parts.sales, align: "right" },
+    { key: "pGross", header: "Parts gross", cell: (r) => <span className="font-medium">{fmtMoney(r.parts.gross)}</span>, sortable: true, sortValue: (r) => r.parts.gross, align: "right" },
+    { key: "pGp", header: "GP %", cell: (r) => fmtPct(r.parts.grossPct, 1), sortable: true, sortValue: (r) => r.parts.grossPct, align: "right", hideOnMobile: true },
+  ];
 
   const cols: Column<Row>[] = [
     { key: "name", header: "Store", cell: (r) => { const b = storeBrand(r.abbreviation); return <Link href={reportHref("/reports", { ...f, storeId: r.storeId })} className="flex items-center gap-2 font-medium hover:underline"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: b.accent }} />{r.name}</Link>; }, sortable: true, sortValue: (r) => r.name, sticky: true },
@@ -70,6 +89,19 @@ export default function FleetPage() {
           <Button size="sm" variant="subtle" onClick={() => downloadCsv(`fleet-${f.basis}-${f.startDate}_${f.endDate}.csv`, toCsv(rows.map(({ storeId: _s, ...r }) => r)))}>Export CSV</Button>
         </div>
         <DataTable<Row> columns={cols} rows={rows} keyField={(r) => r.storeId} initialSort={{ key: "totalSale", dir: "desc" }} density="compact" />
+      </Card>
+
+      <Card padded={false}>
+        <div className="flex items-center justify-between p-4 pb-2">
+          <CardHeader>
+            <CardTitle>Financial statement — Service &amp; Parts</CardTitle>
+            <CardDescription>GL postings for the date range (same source as the printed OEM statement) · fleet service gross {fmtMoney(FT.sg)} on {fmtMoney(FT.ss)} · parts gross {fmtMoney(FT.pg)} on {fmtMoney(FT.ps)}</CardDescription>
+          </CardHeader>
+          <Button size="sm" variant="subtle" onClick={() => downloadCsv(`fleet-financials-${f.startDate}_${f.endDate}.csv`, toCsv(finRows.map((r) => ({ store: r.abbreviation ?? r.name, asOf: r.asOf, serviceRos: r.service.roCount, serviceSales: r.service.sales, serviceCost: r.service.cost, serviceGross: r.service.gross, partsSales: r.parts.sales, partsCost: r.parts.cost, partsGross: r.parts.gross }))))}>Export CSV</Button>
+        </div>
+        {fin.loading ? <Skeleton className="h-40 w-full" /> : fin.error ? <EmptyState title="Couldn't load financials" description={fin.error} /> : finRows.length === 0 ? <EmptyState title="No GL snapshots in this range" /> : (
+          <DataTable<FinRow> columns={finCols} rows={finRows} keyField={(r) => r.storeId} initialSort={{ key: "sGross", dir: "desc" }} density="compact" />
+        )}
       </Card>
     </div>
   );
