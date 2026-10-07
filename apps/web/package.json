@@ -24,7 +24,8 @@
     "facts:build": "tsx --conditions=react-server scripts/build-facts.ts",
     "seed:stores": "tsx --conditions=react-server scripts/seed-amg-stores.ts",
     "sync:store": "tsx --conditions=react-server scripts/sync-store.ts",
-    "sync:all": "tsx --conditions=react-server scripts/sync-all.ts"
+    "sync:all": "tsx --conditions=react-server scripts/sync-all.ts",
+    "gl:snapshot": "tsx --conditions=react-server scripts/gl-snapshot.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",

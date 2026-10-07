@@ -70,6 +70,11 @@ export default async function SyncStatusPage() {
   const latestByStore = new Map<string, (typeof runs)[number]>();
   for (const r of runs) if (!latestByStore.has(r.storeId)) latestByStore.set(r.storeId, r);
 
+  const glLatest = storeIds.length
+    ? await prisma.glAccountDaily.groupBy({ by: ["storeId"], where: { storeId: { in: storeIds } }, _max: { asOfDate: true, updatedAt: true } })
+    : [];
+  const glByStore = new Map(glLatest.map((g) => [g.storeId, g] as const));
+
   const watermarks = storeIds.length
     ? await prisma.rawRepairOrder.groupBy({
         by: ["storeId"],
@@ -116,6 +121,7 @@ export default async function SyncStatusPage() {
                 <th className="py-2 pr-3 text-right">Duration</th>
                 <th className="py-2 pr-3">Newest RO fetched</th>
                 <th className="py-2 pr-3 text-right">ROs on file</th>
+                <th className="py-2 pr-3">GL snapshot</th>
               </tr>
             </thead>
             <tbody>
@@ -141,6 +147,7 @@ export default async function SyncStatusPage() {
                     <td className="py-2 pr-3 text-right tabular-nums">{r ? fmtDur(r.startedAt, r.finishedAt) : "—"}</td>
                     <td className="py-2 pr-3">{fmtWhen(wm?._max.fetchedAt)}</td>
                     <td className="py-2 pr-3 text-right tabular-nums">{wm?._count._all?.toLocaleString() ?? "0"}</td>
+                    <td className="py-2 pr-3">{(() => { const g = glByStore.get(s.id); if (!g?._max.asOfDate) return <Badge tone="danger" size="sm">none</Badge>; const d = g._max.asOfDate.toISOString().slice(0, 10); return <Badge tone={ageHours(g._max.updatedAt) <= 30 ? "success" : "warning"} size="sm">{d.slice(5).replace("-", "/")}</Badge>; })()}</td>
                   </tr>
                 );
               })}
