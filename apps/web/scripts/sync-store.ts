@@ -18,6 +18,7 @@ import { readFileSync } from "node:fs";
 import { prisma } from "../lib/db";
 import { collectRepairOrders } from "../lib/sources/tekion/collector";
 import { aggregateMetrics } from "../lib/aggregate/aggregator";
+import { buildRoFacts } from "../lib/facts/buildRoFacts";
 import { TekionRateLimitError } from "../lib/sources/tekion/client";
 
 const STALE_RUN_MINUTES = 30;
@@ -51,6 +52,7 @@ export async function syncStore(abbrev: string, windowDays: number): Promise<{
   metricsRowsWritten: number;
   datesProcessed: string[];
   unclassifiedOpcodes: string[];
+  factsBuilt: number;
 }> {
   const store = await prisma.store.findFirst({
     where: { abbreviation: abbrev },
@@ -99,7 +101,7 @@ export async function syncStore(abbrev: string, windowDays: number): Promise<{
       advisorResolverOptions: { seed: loadAdvisorSeed(abbrev) },
     });
     console.log(
-      `${abbrev} collect: fetched=${collectResult.rosFetched} created=${collectResult.created} updated=${collectResult.updated} unchanged=${collectResult.unchanged}`,
+      `${abbrev} collect: fetched=${collectResult.rosFetched} created=${collectResult.created} updated=${collectResult.updated} unchanged=${collectResult.unchanged} skippedFanOut=${collectResult.skippedFanOut} apiCalls=${collectResult.apiCallCount}`,
     );
   } catch (err) {
     if (err instanceof TekionRateLimitError) {
@@ -138,6 +140,12 @@ export async function syncStore(abbrev: string, windowDays: number): Promise<{
     `${abbrev} aggregate: dates=${agg.datesProcessed.length} metricsRows=${agg.metricsRowsWritten} unclassified=${agg.unclassifiedOpcodes.length}`,
   );
 
+  // v2 fact layer: rebuild RoFact/RoOpFact for every raw row this run wrote
+  // (fetchedAt is stamped at write time, so "since run start" is exact).
+  // Legacy AdvisorDailyMetrics above stays for the old email-path dashboards.
+  const facts = await buildRoFacts({ storeId: store.id, fetchedSince: new Date(now.getTime() - 1000) });
+  console.log(`${abbrev} facts: ros=${facts.rosBuilt} ops=${facts.opsBuilt} unclassified=${facts.unclassifiedOpcodes.length}`);
+
   return {
     abbrev,
     rosFetched: collectResult?.rosFetched ?? 0,
@@ -145,6 +153,7 @@ export async function syncStore(abbrev: string, windowDays: number): Promise<{
     metricsRowsWritten: agg.metricsRowsWritten,
     datesProcessed: agg.datesProcessed,
     unclassifiedOpcodes: agg.unclassifiedOpcodes,
+    factsBuilt: facts.rosBuilt,
   };
 }
 

@@ -77,6 +77,7 @@ export interface CollectResult {
   created: number;
   updated: number;
   unchanged: number;
+  skippedFanOut: number;
   advisorsResolved: number;
   apiCallCount: number;
   warnings: CollectWarning[];
@@ -184,6 +185,8 @@ interface InternalCounters {
   created: number;
   updated: number;
   unchanged: number;
+  /** ROs whose header modifiedTime matched our stored copy — fan-out skipped. */
+  skippedFanOut: number;
   advisorsResolved: number;
   rosFetched: number;
   warnings: CollectWarning[];
@@ -273,6 +276,7 @@ export async function collectRepairOrders(
     created: 0,
     updated: 0,
     unchanged: 0,
+    skippedFanOut: 0,
     advisorsResolved: 0,
     rosFetched: 0,
     warnings: [],
@@ -448,6 +452,26 @@ export async function collectRepairOrders(
 
     try {
       const advisorTekionId = ro.assignee?.advisor?.id ?? null;
+
+      // HEADER-FIRST SKIP: the search payload already carries ro.modifiedTime.
+      // Tekion bumps modifiedTime on ANY change to the RO tree (jobs, ops,
+      // parts, status, close). If our stored sourceModifiedAt matches, the
+      // jobs→ops→parts fan-out (3-15 calls per RO) would return identical data —
+      // skip it. This is what keeps a 7-store nightly inside the API quota.
+      const srcModified = epochToDate(ro.modifiedTime);
+      if (srcModified) {
+        const prior = await prisma.rawRepairOrder.findUnique({
+          where: { storeId_documentId: { storeId, documentId } },
+          select: { sourceModifiedAt: true, businessDate: true },
+        });
+        if (prior?.sourceModifiedAt && prior.sourceModifiedAt.getTime() === srcModified.getTime()) {
+          counters.unchanged += 1;
+          counters.skippedFanOut += 1;
+          counters.touchedBusinessDates.add(prior.businessDate.toISOString());
+          return;
+        }
+      }
+
       const { snapshot, vehicle } = await fetchSnapshot(ro);
       const advisor = await ensureAdvisor(advisorTekionId);
       snapshot.advisorName = advisor.name;
@@ -489,6 +513,7 @@ export async function collectRepairOrders(
             businessDate,
             payload: payload as never,
             contentHash,
+            sourceModifiedAt: srcModified,
             fetchedAt: now,
           },
         });
@@ -508,6 +533,7 @@ export async function collectRepairOrders(
             businessDate,
             payload: payload as never,
             contentHash,
+            sourceModifiedAt: srcModified,
             fetchedAt: now,
           },
         });
@@ -520,10 +546,16 @@ export async function collectRepairOrders(
         // written before closeDate fell back to modifiedTime). Light repair.
         await prisma.rawRepairOrder.update({
           where: { id: existing.id },
-          data: { status: ro.status ?? null, closeDate, businessDate, fetchedAt: now },
+          data: { status: ro.status ?? null, closeDate, businessDate, sourceModifiedAt: srcModified, fetchedAt: now },
         });
         counters.updated += 1;
       } else {
+        // Payload identical; stamp sourceModifiedAt so the NEXT run can skip
+        // the fan-out entirely (legacy rows predate this column).
+        await prisma.rawRepairOrder.update({
+          where: { id: existing.id },
+          data: { sourceModifiedAt: srcModified },
+        });
         counters.unchanged += 1;
       }
     } catch (err) {
@@ -580,6 +612,7 @@ export async function collectRepairOrders(
           created: counters.created,
           updated: counters.updated,
           unchanged: counters.unchanged,
+          skippedFanOut: counters.skippedFanOut,
           advisorsResolved: counters.advisorsResolved,
           warningsCount: counters.warnings.length,
           ...(opts.interruptedBy ? { interruptedBy: opts.interruptedBy } : {}),
@@ -663,6 +696,7 @@ export async function collectRepairOrders(
       created: counters.created,
       updated: counters.updated,
       unchanged: counters.unchanged,
+      skippedFanOut: counters.skippedFanOut,
       advisorsResolved: counters.advisorsResolved,
       apiCallCount: counters.apiCallCount,
       warnings: counters.warnings,

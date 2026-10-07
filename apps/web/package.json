@@ -21,6 +21,7 @@
     "aggregate:st": "tsx --conditions=react-server scripts/aggregate-st.ts",
     "consolidate:st": "tsx --conditions=react-server scripts/consolidate-st-store.ts",
     "sync:st": "tsx --conditions=react-server scripts/sync-st.ts",
+    "facts:build": "tsx --conditions=react-server scripts/build-facts.ts",
     "seed:stores": "tsx --conditions=react-server scripts/seed-amg-stores.ts",
     "sync:store": "tsx --conditions=react-server scripts/sync-store.ts",
     "sync:all": "tsx --conditions=react-server scripts/sync-all.ts"

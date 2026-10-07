@@ -136,6 +136,8 @@ model Store {
   syncRuns         SyncRun[]
   rawRepairOrders  RawRepairOrder[]
   opcodeCategories OpcodeCategory[]
+  roFacts          RoFact[]
+  roOpFacts        RoOpFact[]
 
   @@unique([abbreviation])
   @@index([organizationId])
@@ -158,6 +160,8 @@ model Advisor {
 
   dailyMetrics   AdvisorDailyMetrics[]
   dailyCommodity AdvisorDailyCommodity[]
+  roFacts        RoFact[]
+  roOpFacts      RoOpFact[]
 
   @@unique([storeId, nameNormalized])
   @@index([storeId])
@@ -392,12 +396,139 @@ model RawRepairOrder {
   closeDate    DateTime?
   businessDate DateTime    // date dimension (midnight UTC) for daily aggregation
 
+  // Tekion-side modifiedTime of the RO header at the time of the last fan-out.
+  // Lets the collector SKIP the jobs/ops/parts fan-out when the header hasn't
+  // changed since we last pulled it (saves ~80% of API calls on re-syncs).
+  sourceModifiedAt DateTime?
+
   payload     Json    // full RO incl. nested jobs/operations/parts snapshot
   contentHash String  // sha256 of payload for idempotent upsert / change detection
 
   @@unique([storeId, documentId])
   @@index([storeId, businessDate])
   @@index([syncRunId])
+}
+
+// ---------------------------------------------------------------------------
+// FACT TABLES (v2 reporting layer, 2026-10-07)
+//
+// Derived from RawRepairOrder.payload by lib/facts/buildRoFacts.ts. One row per
+// RO (RoFact) and one row per operation (RoOpFact). All money is DOLLARS, all
+// dates are Pacific-time business dates stored as midnight UTC (date-only).
+// Every dashboard/report reads these; nothing reads payload JSON at request time.
+// Rebuilt idempotently (delete+insert per RO) whenever the raw row changes.
+// ---------------------------------------------------------------------------
+
+model RoFact {
+  id        String   @id @default(uuid())
+  builtAt   DateTime @default(now())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  documentId     String
+  documentNumber String
+  status         String?
+  roType         String?   // Tekion ro.type (WALK_IN / APPOINTMENT / SALES / ...)
+
+  advisorId       String?
+  advisor         Advisor? @relation(fields: [advisorId], references: [id], onDelete: SetNull)
+  advisorTekionId String?
+
+  // Pacific-time business dates (midnight UTC date-only)
+  openDate  DateTime           // from CHECKIN_TIME / creationTime
+  closeDate DateTime?          // from schedule CLOSED_TIME (fallback INVOICED_TIME, then modifiedTime if terminal)
+  openTs    DateTime
+  closeTs   DateTime?
+  isClosed  Boolean  @default(false)
+
+  vin     String?
+  year    Int?
+  make    String?
+  model   String?
+  mileage Int?
+
+  jobCount Int @default(0)
+  opCount  Int @default(0)
+
+  laborSale  Float @default(0)
+  laborCost  Float @default(0)
+  partsSale  Float @default(0)
+  partsCost  Float @default(0)
+  billHours  Float @default(0)
+
+  // pay-type split (dollars) — CP / WARRANTY / INTERNAL / OTHER(CVSC, etc.)
+  cpLaborSale  Float @default(0)
+  cpPartsSale  Float @default(0)
+  cpBillHours  Float @default(0)
+  wLaborSale   Float @default(0)
+  wPartsSale   Float @default(0)
+  wBillHours   Float @default(0)
+  iLaborSale   Float @default(0)
+  iPartsSale   Float @default(0)
+  iBillHours   Float @default(0)
+  oLaborSale   Float @default(0)
+  oPartsSale   Float @default(0)
+  oBillHours   Float @default(0)
+
+  // menu / ALA penetration flags (strict TEK SERVICE_MENU for menu)
+  hasMenu     Boolean @default(false)
+  menuLines   Int     @default(0)
+  menuLaborSale Float @default(0)
+  menuPartsSale Float @default(0)
+  hasAla      Boolean @default(false)
+  isCpRo      Boolean @default(false)   // any CP dollars on the RO
+
+  ops RoOpFact[]
+
+  @@unique([storeId, documentId])
+  @@index([storeId, openDate])
+  @@index([storeId, closeDate])
+  @@index([storeId, advisorId, closeDate])
+  @@index([storeId, advisorId, openDate])
+}
+
+model RoOpFact {
+  id String @id @default(uuid())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  roFactId String
+  roFact   RoFact @relation(fields: [roFactId], references: [id], onDelete: Cascade)
+
+  documentId     String
+  documentNumber String
+  advisorId      String?
+  advisor        Advisor? @relation(fields: [advisorId], references: [id], onDelete: SetNull)
+
+  openDate  DateTime
+  closeDate DateTime?
+
+  jobNumber  String?
+  jobStatus  String?
+  payType    String?   // CUSTOMER_PAY | WARRANTY | INTERNAL | ...
+  subPayType String?
+  payClass   String    // CP | W | I | O
+
+  opcode      String
+  opcodeDesc  String?
+  category    String   // MENU | ALA | COMMODITY | REC | OTHER
+  commodityKey String?
+  isMenu      Boolean @default(false)
+
+  laborSale Float @default(0)
+  laborCost Float @default(0)
+  billHours Float @default(0)
+  partsSale Float @default(0)
+  partsCost Float @default(0)
+  partsQty  Float @default(0)
+
+  @@index([storeId, closeDate])
+  @@index([storeId, openDate])
+  @@index([storeId, opcode])
+  @@index([storeId, category, closeDate])
+  @@index([roFactId])
 }
 
 model OpcodeCategory {
