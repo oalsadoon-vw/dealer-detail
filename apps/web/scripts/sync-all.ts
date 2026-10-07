@@ -69,6 +69,26 @@ async function main() {
     console.log("No API-enabled stores found. Run seed:stores.");
     return;
   }
+
+  // ---- Daily rotation (starvation guard) ---------------------------------
+  // 2026-09-01: a hard `timeout` on the nightly wrapper killed the run partway
+  // through EVERY night for 19 nights. Because this list is alphabetical, the
+  // casualties were always the same tail-end four (SCT, SCVW, TOL, VWC) — they
+  // silently went 3 weeks without a sync while the dashboard looked fine.
+  //
+  // Rotating the start index by day-of-year means a truncated run sheds a
+  // DIFFERENT store each night, so no store can ever go more than ~7 days
+  // stale from truncation alone. Set SYNC_NO_ROTATE=1 for deterministic order
+  // (tests/backfills).
+  if (process.env.SYNC_NO_ROTATE !== "1" && stores.length > 1) {
+    const dayOfYear = Math.floor(
+      (Date.now() - new Date(new Date().getUTCFullYear(), 0, 0).getTime()) / 86400000,
+    );
+    const offset = dayOfYear % stores.length;
+    stores.push(...stores.splice(0, offset));
+    console.log(`store rotation: day-of-year ${dayOfYear} -> starting at ${stores[0].abbreviation}`);
+  }
+
   console.log(
     `sync-all: ${stores.length} stores, window=${windowDays}d, cooldown=${cooldownSeconds}s\n` +
       stores.map((s) => `  - ${s.abbreviation} (${s.name})`).join("\n"),
