@@ -18,7 +18,17 @@ type Summary = {
   skippedFanOut?: number;
   warningsCount?: number;
   interruptedBy?: string;
+  source?: "internal" | "openapi";
+  resumedFrom?: string | null;
+  authFailed?: boolean;
 };
+
+function sourceBadge(sm: Summary, status: string) {
+  if (sm.authFailed) return <Badge tone="danger" size="sm">auth · browser logged out</Badge>;
+  void status;
+  const src = sm.source ?? "openapi";
+  return <Badge tone={src === "internal" ? "info" : "neutral"} size="sm">{src}</Badge>;
+}
 
 function fmtWhen(d: Date | null | undefined) {
   if (!d) return "—";
@@ -138,7 +148,9 @@ export default async function SyncStatusPage() {
                     </td>
                     <td className="py-2 pr-3 text-fg-muted">{s.apiSyncEnabled ? s.tekionDealerId ?? "—" : "API off"}</td>
                     <td className="py-2 pr-3">{fmtWhen(r?.startedAt)}</td>
-                    <td className="py-2 pr-3">{r ? <Badge tone={statusTone(r.status)} size="sm">{r.status.replace(/_/g, " ")}</Badge> : "—"}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">
+                      {r ? <><Badge tone={statusTone(r.status)} size="sm">{r.status.replace(/_/g, " ")}</Badge> <span className="ml-1">{sourceBadge(sm, r.status)}</span></> : "—"}
+                    </td>
                     <td className="py-2 pr-3 text-right tabular-nums">{r?.rosFetched ?? "—"}</td>
                     <td className="py-2 pr-3 text-right tabular-nums text-fg-muted">
                       {r ? `${sm.created ?? 0} / ${sm.updated ?? 0} / ${sm.skippedFanOut ?? 0}` : "—"}
@@ -188,6 +200,8 @@ export default async function SyncStatusPage() {
                     sm.warningsCount ? `${sm.warningsCount} warnings` : null,
                     errs ? `${errs} errors` : null,
                     sm.interruptedBy ? `interrupted (${sm.interruptedBy})` : null,
+                    sm.resumedFrom ? `resumed from ${fmtWhen(new Date(sm.resumedFrom))}` : null,
+                    sm.authFailed ? "browser not logged into Tekion" : null,
                   ].filter(Boolean).join(" · ");
                   return (
                     <tr key={r.id} className="border-b border-line/60">
@@ -197,7 +211,7 @@ export default async function SyncStatusPage() {
                       <td className="py-1.5 pr-3 text-fg-muted whitespace-nowrap">
                         {r.windowStart.toISOString().slice(0, 10)} → {r.windowEnd.toISOString().slice(0, 10)}
                       </td>
-                      <td className="py-1.5 pr-3"><Badge tone={statusTone(r.status)} size="sm">{r.status.replace(/_/g, " ")}</Badge></td>
+                      <td className="py-1.5 pr-3 whitespace-nowrap"><Badge tone={statusTone(r.status)} size="sm">{r.status.replace(/_/g, " ")}</Badge> <span className="ml-1">{sourceBadge(sm, r.status)}</span></td>
                       <td className="py-1.5 pr-3 text-right tabular-nums">{r.rosFetched}</td>
                       <td className="py-1.5 pr-3 text-right tabular-nums">{r.apiCallCount}</td>
                       <td className="py-1.5 pr-3 text-right tabular-nums">{fmtDur(r.startedAt, r.finishedAt)}</td>

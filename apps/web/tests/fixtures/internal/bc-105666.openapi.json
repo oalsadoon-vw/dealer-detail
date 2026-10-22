@@ -1,0 +1,1313 @@
+{
+ "ro": {
+  "fees": {
+   "id": "6ad39f8e764261330689c99e",
+   "link": "/repair-orders/6ad39f8e764261330689c99e/ro-fees"
+  },
+  "jobs": {
+   "id": "6ad39f8e764261330689c99e",
+   "link": "/repair-orders/6ad39f8e764261330689c99e/jobs"
+  },
+  "tags": [
+   {
+    "type": "SYSTEM",
+    "field": "SERVICE_TYPE_ID",
+    "value": "629607f6857aba0007201fbc"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "RO",
+    "value": "BASE_PAY_TYPE_INTERNAL"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "JOB",
+    "value": "SERVICE_MENU"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "JOB",
+    "value": "MPVI"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "SERVICE_TYPE_ID",
+    "value": "6296580f9b9717000603058e"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "SERVICE_TYPE_ID",
+    "value": "62ab9e23d601800006c038be"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "FLAG",
+    "value": "AUTO_ADDED"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "OPCODE",
+    "value": "CADAIRFILTER"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "SKILL",
+    "value": "62967e0f1e9d9800066f95c5"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "OPCODE",
+    "value": "MPVI"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "OPCODE",
+    "value": "TEK7500BNM"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "RO",
+    "value": "BASE_PAY_TYPE_CUSTOMER_PAY"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "SKILL",
+    "value": "625505ea77490b000771f95a"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "JOB",
+    "value": "DEFAULT"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "SERVICE_TYPE_ID",
+    "value": "65530c2bd0e3ef410082b54f"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "SERVICE_TYPE_ID",
+    "value": "67be181508e97f766a9fecd4"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "OPCODE",
+    "value": "TPS"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "PAY_TYPE",
+    "value": "INTERNAL"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "JOB",
+    "value": "STATUS_CLOSED"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "PAY_TYPE",
+    "value": "CUSTOMER_PAY"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "OPCODE",
+    "value": "CABIN"
+   },
+   {
+    "type": "SYSTEM",
+    "field": "SKILL",
+    "value": "6299863824aa9a000617b52f"
+   }
+  ],
+  "type": "APPOINTMENT",
+  "status": "CLOSED",
+  "coupons": {
+   "id": "6ad39f8e764261330689c99e",
+   "link": "/repair-orders/6ad39f8e764261330689c99e/ro-coupons"
+  },
+  "vehicle": {
+   "id": "6ad39f8e764261330689c99e",
+   "link": "/repair-orders/6ad39f8e764261330689c99e/ro-vehicle"
+  },
+  "assignee": {
+   "advisor": {
+    "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+    "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+   },
+   "department": {
+    "id": "1251_department_d",
+    "link": "/departments/1251_department_d"
+   },
+   "technicians": [
+    {
+     "status": "COMPLETED",
+     "technician": {
+      "id": "f7b0fefc-8a6b-4cce-8411-46e67fab8e3b",
+      "link": "/users/f7b0fefc-8a6b-4cce-8411-46e67fab8e3b"
+     }
+    }
+   ]
+  },
+  "invoices": {
+   "id": "6ad39f8e764261330689c99e",
+   "link": "/repair-orders/6ad39f8e764261330689c99e/ro-invoices"
+  },
+  "priority": 2665,
+  "schedule": [
+   {
+    "type": "APPOINTMENT_TIME",
+    "value": 1792251900000
+   },
+   {
+    "type": "INVOICED_TIME",
+    "value": 1792272072267
+   },
+   {
+    "type": "CHECKIN_TIME",
+    "value": 1792253838454
+   },
+   {
+    "type": "CLOSED_TIME",
+    "value": 1792275940076
+   },
+   {
+    "type": "VEHICLE_PICKUP_TIME",
+    "value": null
+   },
+   {
+    "type": "PROMISE_TIME",
+    "value": 1792263600000
+   }
+  ],
+  "tagNumber": "9268",
+  "documentId": "6ad39f8e764261330689c99e",
+  "appointment": {
+   "id": "43a18f16-7082-493b-a187-11a2449bc135",
+   "link": "/service-appointments/43a18f16-7082-493b-a187-11a2449bc135"
+  },
+  "creationTime": 1792254049530,
+  "modifiedTime": 1792275940166,
+  "createdMethod": null,
+  "externalNotes": "",
+  "documentNumber": "105666",
+  "transportation": {
+   "id": "2d57445f-4bbe-4cb5-ba11-df4a0a19ac6b",
+   "link": "/transportation-types/2d57445f-4bbe-4cb5-ba11-df4a0a19ac6b"
+  },
+  "billingCustomer": {
+   "id": "ad2470e6-e9b0-4d17-bb2b-df7c59acd923",
+   "link": "/repair-orders/6ad39f8e764261330689c99e/ro-customers/ad2470e6-e9b0-4d17-bb2b-df7c59acd923"
+  },
+  "createdByUserId": {
+   "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+   "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+  },
+  "dropOffCustomer": {
+   "id": "ad2470e6-e9b0-4d17-bb2b-df7c59acd923",
+   "link": "/repair-orders/6ad39f8e764261330689c99e/ro-customers/ad2470e6-e9b0-4d17-bb2b-df7c59acd923"
+  },
+  "primaryCustomer": {
+   "id": "ad2470e6-e9b0-4d17-bb2b-df7c59acd923",
+   "link": "/repair-orders/6ad39f8e764261330689c99e/ro-customers/ad2470e6-e9b0-4d17-bb2b-df7c59acd923"
+  },
+  "modifiedByUserId": {
+   "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+   "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+  },
+  "priorityOverridden": false
+ },
+ "jobs": [
+  {
+   "job": {
+    "id": "6ad3a03214cedbcfb936524b",
+    "fees": {
+     "id": "6ad3a03214cedbcfb936524b",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03214cedbcfb936524b/job-fees"
+    },
+    "hold": false,
+    "tags": [
+     {
+      "type": "SYSTEM",
+      "field": "SERVICE_TYPE_ID",
+      "value": "65530c2bd0e3ef410082b54f"
+     }
+    ],
+    "type": "SERVICE_MENU",
+    "causes": [
+     {
+      "id": null,
+      "text": "For 7.50K Miles this is the Does Not Meet Factory Requirements maintenance service to be performed"
+     }
+    ],
+    "status": "CLOSED",
+    "concern": {
+     "text": "7500 miles basic normal service menu",
+     "type": "NONE"
+    },
+    "coupons": {
+     "id": "6ad3a03214cedbcfb936524b",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03214cedbcfb936524b/job-coupons"
+    },
+    "payType": "CUSTOMER_PAY",
+    "sublets": {
+     "id": "6ad3a03214cedbcfb936524b",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03214cedbcfb936524b/sublets"
+    },
+    "jobNumber": "1",
+    "operations": {
+     "id": "6ad3a03214cedbcfb936524b",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03214cedbcfb936524b/operations"
+    },
+    "subPayType": "CUSTOMER_PAY",
+    "creationTime": 1792254002415,
+    "modifiedTime": 1792275940229,
+    "completionTime": 1792258493943,
+    "createdByUserId": {
+     "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+     "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+    },
+    "modifiedByUserId": {
+     "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+     "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+    }
+   },
+   "operations": [
+    {
+     "parts": [
+      {
+       "id": 1411858,
+       "core": {
+        "coreAmount": 0,
+        "quantities": [
+         {
+          "type": "CORE",
+          "value": 0
+         }
+        ],
+        "corePartNumber": "19432357",
+        "unitCoreAmount": 0
+       },
+       "fees": {
+        "id": "1411858",
+        "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03214cedbcfb936524b/operations/6ad3a03214cedbcfb936524c/parts/1411858/part-fees"
+       },
+       "type": "PART",
+       "brand": "GM",
+       "causal": false,
+       "status": "DELIVERED",
+       "partName": "19432357 - OIL",
+       "coreReturn": {
+        "quantity": 0,
+        "unitCoreAmount": 0,
+        "coreReturnAmount": 0
+       },
+       "costAmount": 2316,
+       "partNumber": "19432357",
+       "quantities": [
+        {
+         "type": "SALE",
+         "value": 6
+        },
+        {
+         "type": "DELIVERED",
+         "value": 6
+        },
+        {
+         "type": "SOR",
+         "value": 0
+        },
+        {
+         "type": "RESERVED",
+         "value": 0
+        },
+        {
+         "type": "HOLD",
+         "value": 0
+        }
+       ],
+       "saleAmount": 4218,
+       "creationTime": 1792254050681,
+       "modifiedTime": 1792258471255,
+       "unitCostAmount": 386,
+       "unitSaleAmount": 703,
+       "createdByUserId": {
+        "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+        "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+       },
+       "eligibleForClaim": true,
+       "modifiedByUserId": {
+        "id": "f7b0fefc-8a6b-4cce-8411-46e67fab8e3b",
+        "link": "/users/f7b0fefc-8a6b-4cce-8411-46e67fab8e3b"
+       }
+      },
+      {
+       "id": 1411860,
+       "core": {
+        "coreAmount": 0,
+        "quantities": [
+         {
+          "type": "CORE",
+          "value": 0
+         }
+        ],
+        "corePartNumber": null,
+        "unitCoreAmount": 0
+       },
+       "fees": {
+        "id": "1411860",
+        "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03214cedbcfb936524b/operations/6ad3a03214cedbcfb936524c/parts/1411860/part-fees"
+       },
+       "type": "PART",
+       "brand": "OTHER",
+       "causal": false,
+       "status": "DELIVERED",
+       "partName": "BG9822 - CLASS ACT",
+       "coreReturn": {
+        "quantity": 0,
+        "unitCoreAmount": 0,
+        "coreReturnAmount": 0
+       },
+       "costAmount": 20,
+       "partNumber": "BG9822",
+       "quantities": [
+        {
+         "type": "SALE",
+         "value": 1
+        },
+        {
+         "type": "DELIVERED",
+         "value": 1
+        },
+        {
+         "type": "SOR",
+         "value": 0
+        },
+        {
+         "type": "RESERVED",
+         "value": 0
+        },
+        {
+         "type": "HOLD",
+         "value": 0
+        }
+       ],
+       "saleAmount": 1299,
+       "creationTime": 1792254050681,
+       "modifiedTime": 1792258471255,
+       "unitCostAmount": 20,
+       "unitSaleAmount": 1299,
+       "createdByUserId": {
+        "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+        "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+       },
+       "eligibleForClaim": true,
+       "modifiedByUserId": {
+        "id": "f7b0fefc-8a6b-4cce-8411-46e67fab8e3b",
+        "link": "/users/f7b0fefc-8a6b-4cce-8411-46e67fab8e3b"
+       }
+      },
+      {
+       "id": 1411861,
+       "core": {
+        "coreAmount": 0,
+        "quantities": [
+         {
+          "type": "CORE",
+          "value": 0
+         }
+        ],
+        "corePartNumber": null,
+        "unitCoreAmount": 0
+       },
+       "fees": {
+        "id": "1411861",
+        "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03214cedbcfb936524b/operations/6ad3a03214cedbcfb936524c/parts/1411861/part-fees"
+       },
+       "type": "PART",
+       "brand": "GM",
+       "causal": false,
+       "status": "DELIVERED",
+       "partName": "19435370 - CLEANER",
+       "coreReturn": {
+        "quantity": 0,
+        "unitCoreAmount": 0,
+        "coreReturnAmount": 0
+       },
+       "costAmount": 2119,
+       "partNumber": "19435370",
+       "quantities": [
+        {
+         "type": "SALE",
+         "value": 1
+        },
+        {
+         "type": "DELIVERED",
+         "value": 1
+        },
+        {
+         "type": "SOR",
+         "value": 0
+        },
+        {
+         "type": "RESERVED",
+         "value": 0
+        },
+        {
+         "type": "HOLD",
+         "value": 0
+        }
+       ],
+       "saleAmount": 2785,
+       "creationTime": 1792254050681,
+       "modifiedTime": 1792258471255,
+       "unitCostAmount": 2119,
+       "unitSaleAmount": 2785,
+       "createdByUserId": {
+        "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+        "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+       },
+       "eligibleForClaim": true,
+       "modifiedByUserId": {
+        "id": "f7b0fefc-8a6b-4cce-8411-46e67fab8e3b",
+        "link": "/users/f7b0fefc-8a6b-4cce-8411-46e67fab8e3b"
+       }
+      },
+      {
+       "id": 1411879,
+       "core": {
+        "coreAmount": 0,
+        "quantities": [
+         {
+          "type": "CORE",
+          "value": 0
+         }
+        ],
+        "corePartNumber": "19458926",
+        "unitCoreAmount": 0
+       },
+       "fees": {
+        "id": "1411879",
+        "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03214cedbcfb936524b/operations/6ad3a03214cedbcfb936524c/parts/1411879/part-fees"
+       },
+       "type": "PART",
+       "brand": "GM",
+       "causal": false,
+       "status": "DELIVERED",
+       "partName": "19458926 (S) - FILTER",
+       "coreReturn": {
+        "quantity": 0,
+        "unitCoreAmount": 0,
+        "coreReturnAmount": 0
+       },
+       "costAmount": 580,
+       "partNumber": "19458926",
+       "quantities": [
+        {
+         "type": "SALE",
+         "value": 1
+        },
+        {
+         "type": "DELIVERED",
+         "value": 1
+        },
+        {
+         "type": "SOR",
+         "value": 0
+        },
+        {
+         "type": "RESERVED",
+         "value": 0
+        },
+        {
+         "type": "HOLD",
+         "value": 0
+        }
+       ],
+       "saleAmount": 2900,
+       "creationTime": 1792255267937,
+       "modifiedTime": 1792258494623,
+       "unitCostAmount": 580,
+       "unitSaleAmount": 2900,
+       "createdByUserId": {
+        "id": "143b005b-04c0-40c5-87c9-e4d12c799d7e",
+        "link": "/users/143b005b-04c0-40c5-87c9-e4d12c799d7e"
+       },
+       "eligibleForClaim": true,
+       "modifiedByUserId": {
+        "id": "f7b0fefc-8a6b-4cce-8411-46e67fab8e3b",
+        "link": "/users/f7b0fefc-8a6b-4cce-8411-46e67fab8e3b"
+       }
+      }
+     ],
+     "operation": {
+      "id": "6ad3a03214cedbcfb936524c",
+      "labor": {
+       "costAmount": 1700,
+       "saleAmount": 3312,
+       "billDuration": 3600,
+       "laborAllowanceDuration": 3600
+      },
+      "parts": {
+       "id": "6ad3a03214cedbcfb936524c",
+       "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03214cedbcfb936524b/operations/6ad3a03214cedbcfb936524c/parts"
+      },
+      "opcode": "TEK7500BNM",
+      "corrections": [
+       {
+        "id": "6ad3a03214cedbcfb936524e",
+        "text": "Change Engine Oil Filter on 6 Cylinder Vehicles"
+       },
+       {
+        "id": "6ad3a03214cedbcfb9365252",
+        "text": "Perform Tire Rotation"
+       },
+       {
+        "id": "6ad3a03214cedbcfb9365254",
+        "text": "Install Washer Fluid"
+       },
+       {
+        "id": "6ad3a03214cedbcfb9365257",
+        "text": "Install GM 44K Fuel Cleaner for Gasoline Vehicles"
+       },
+       {
+        "id": "6ad3a03214cedbcfb936525a",
+        "text": "Windshield Wiper Blade Remove and Replace"
+       },
+       {
+        "id": "6ad3a03214cedbcfb936526a",
+        "text": "Engine Oil Level Inspect"
+       },
+       {
+        "id": "6ad3a03214cedbcfb936526c",
+        "text": "Oil Life Monitor Inspect"
+       },
+       {
+        "id": "6ad3a03214cedbcfb936526e",
+        "text": "Tire & Wheel Assembly Inspect"
+       },
+       {
+        "id": "6ad3a03214cedbcfb936525e",
+        "text": "Inspect All Fluid Levels and Top Off As Needed"
+       },
+       {
+        "id": "6ad3a03214cedbcfb9365260",
+        "text": "Inspect Brake Pads and Disc"
+       },
+       {
+        "id": "6ad3a03214cedbcfb9365262",
+        "text": "Inspect Wiper Blades"
+       },
+       {
+        "id": "6ad3a03214cedbcfb9365264",
+        "text": "Adjust Tire Pressures to Factory Specifications"
+       },
+       {
+        "id": "6ad3a03214cedbcfb9365266",
+        "text": "Perform Multi-Point Inspection"
+       },
+       {
+        "id": "6ad3a03214cedbcfb9365268",
+        "text": "Reset Service Reminder"
+       },
+       {
+        "id": "2fbb39a6-d717-4963-bdbf-2c69b431c297",
+        "text": "Performed lof w/ additives, added 5.5qts of 5w30, checked level OK, Reset life "
+       },
+       {
+        "id": "b226bb0e-cf7f-4062-8d20-5c184a8c154a",
+        "text": "Rotated tires and torqued to spec "
+       }
+      ],
+      "creationTime": 1792254002256,
+      "modifiedTime": 1792254002256,
+      "createdByUserId": {
+       "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+       "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+      },
+      "modifiedByUserId": {
+       "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+       "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+      },
+      "opcodeDescription": "7500 miles basic normal service menu",
+      "technicianDetails": {
+       "id": "6ad3a03214cedbcfb936524c",
+       "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03214cedbcfb936524b/operations/6ad3a03214cedbcfb936524c/technicians"
+      },
+      "externalIdentifier": [
+       {
+        "id": null,
+        "number": "1",
+        "source": null,
+        "context": null
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "job": {
+    "id": "6ad3a03b6155930a43d597c8",
+    "fees": {
+     "id": "6ad3a03b6155930a43d597c8",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03b6155930a43d597c8/job-fees"
+    },
+    "hold": false,
+    "tags": [
+     {
+      "type": "SYSTEM",
+      "field": "SERVICE_TYPE_ID",
+      "value": "62ab9e23d601800006c038be"
+     }
+    ],
+    "type": "MPVI",
+    "causes": [
+     {
+      "id": "6ad3a03a48b0bcad4d560df8",
+      "text": "perform as requested"
+     }
+    ],
+    "status": "CLOSED",
+    "concern": {
+     "text": "PERFORM CERTIFIED MULTI-POINT VEHICLE INSPECTION",
+     "type": "NONE"
+    },
+    "coupons": {
+     "id": "6ad3a03b6155930a43d597c8",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03b6155930a43d597c8/job-coupons"
+    },
+    "payType": "INTERNAL",
+    "sublets": {
+     "id": "6ad3a03b6155930a43d597c8",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03b6155930a43d597c8/sublets"
+    },
+    "jobNumber": "2",
+    "operations": {
+     "id": "6ad3a03b6155930a43d597c8",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03b6155930a43d597c8/operations"
+    },
+    "subPayType": "INTERNAL",
+    "creationTime": 1792254011133,
+    "modifiedTime": 1792275940229,
+    "completionTime": 1792258083795,
+    "createdByUserId": {
+     "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+     "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+    },
+    "modifiedByUserId": {
+     "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+     "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+    }
+   },
+   "operations": [
+    {
+     "parts": [],
+     "operation": {
+      "id": "6ad3a03b6155930a43d597c9",
+      "labor": {
+       "costAmount": 0,
+       "saleAmount": 0,
+       "billDuration": 0,
+       "laborAllowanceDuration": 0
+      },
+      "parts": {
+       "id": "6ad3a03b6155930a43d597c9",
+       "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03b6155930a43d597c8/operations/6ad3a03b6155930a43d597c9/parts"
+      },
+      "opcode": "MPVI",
+      "oemOpcodes": [
+       {
+        "opcode": "9400"
+       }
+      ],
+      "corrections": [
+       {
+        "id": "6ad3a03a48b0bcad4d560df6",
+        "text": "PERFORM CERTIFIED MULTI-POINT VEHICLE INSPECTION"
+       }
+      ],
+      "creationTime": 1792254011133,
+      "modifiedTime": 1792254011133,
+      "createdByUserId": {
+       "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+       "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+      },
+      "modifiedByUserId": {
+       "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+       "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+      },
+      "opcodeDescription": "PERFORM CERTIFIED MULTI-POINT VEHICLE INSPECTION",
+      "technicianDetails": {
+       "id": "6ad3a03b6155930a43d597c9",
+       "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a03b6155930a43d597c8/operations/6ad3a03b6155930a43d597c9/technicians"
+      },
+      "externalIdentifier": [
+       {
+        "id": null,
+        "number": "1",
+        "source": null,
+        "context": null
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "job": {
+    "id": "6ad3a040b17fc0789f3d2871",
+    "fees": {
+     "id": "6ad3a040b17fc0789f3d2871",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a040b17fc0789f3d2871/job-fees"
+    },
+    "hold": false,
+    "tags": [
+     {
+      "type": "SYSTEM",
+      "field": "SERVICE_TYPE_ID",
+      "value": "629607f6857aba0007201fbc"
+     }
+    ],
+    "type": "DEFAULT",
+    "causes": [
+     {
+      "id": "6ad3b02dcc204eb8f7dc4448",
+      "text": "perform as requested"
+     }
+    ],
+    "status": "CLOSED",
+    "concern": {
+     "text": "INSPECT TIRE PRESSURES. ADJUST TO FACTORY SPECS.",
+     "type": "NONE"
+    },
+    "coupons": {
+     "id": "6ad3a040b17fc0789f3d2871",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a040b17fc0789f3d2871/job-coupons"
+    },
+    "payType": "INTERNAL",
+    "sublets": {
+     "id": "6ad3a040b17fc0789f3d2871",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a040b17fc0789f3d2871/sublets"
+    },
+    "jobNumber": "3",
+    "operations": {
+     "id": "6ad3a040b17fc0789f3d2871",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a040b17fc0789f3d2871/operations"
+    },
+    "subPayType": "INTERNAL",
+    "creationTime": 1792254016998,
+    "modifiedTime": 1792275940229,
+    "completionTime": 1792258104365,
+    "createdByUserId": {
+     "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+     "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+    },
+    "modifiedByUserId": {
+     "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+     "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+    }
+   },
+   "operations": [
+    {
+     "parts": [],
+     "operation": {
+      "id": "6ad3a040b17fc0789f3d2872",
+      "labor": {
+       "costAmount": 0,
+       "saleAmount": 0,
+       "billDuration": 0,
+       "laborAllowanceDuration": 0
+      },
+      "parts": {
+       "id": "6ad3a040b17fc0789f3d2872",
+       "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a040b17fc0789f3d2871/operations/6ad3a040b17fc0789f3d2872/parts"
+      },
+      "opcode": "TPS",
+      "corrections": [
+       {
+        "id": "538c14cd-f9d7-4c43-a272-845e9b016ce1",
+        "text": "Aired tires to spec "
+       }
+      ],
+      "creationTime": 1792254016998,
+      "modifiedTime": 1792254016998,
+      "createdByUserId": {
+       "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+       "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+      },
+      "modifiedByUserId": {
+       "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+       "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+      },
+      "opcodeDescription": "INSPECT TIRE PRESSURES. ADJUST TO FACTORY SPECS.",
+      "technicianDetails": {
+       "id": "6ad3a040b17fc0789f3d2872",
+       "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3a040b17fc0789f3d2871/operations/6ad3a040b17fc0789f3d2872/technicians"
+      },
+      "externalIdentifier": [
+       {
+        "id": null,
+        "number": "1",
+        "source": null,
+        "context": null
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "job": {
+    "id": "6ad3d4a437b9d44d45946711",
+    "fees": {
+     "id": "6ad3d4a437b9d44d45946711",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946711/job-fees"
+    },
+    "hold": false,
+    "tags": [
+     {
+      "type": "SYSTEM",
+      "field": "ADD_ON_REPAIR",
+      "value": "6a8ddd464611173cecf428c5"
+     },
+     {
+      "type": "SYSTEM",
+      "field": "SERVICE_TYPE_ID",
+      "value": "67be181508e97f766a9fecd4"
+     },
+     {
+      "type": "SYSTEM",
+      "field": "RECOMMENDATION",
+      "value": "6a8ddd464611173cecf428c6"
+     }
+    ],
+    "type": "DEFAULT",
+    "causes": [
+     {
+      "id": "6a483f4aa6e6df61d52d9ba8",
+      "text": "DIRTY UPON INSPECTION "
+     }
+    ],
+    "status": "CLOSED",
+    "concern": {
+     "text": "REPLACE ENGINE AIR FILTER AND CLEAN AIR BOX",
+     "type": "NONE"
+    },
+    "coupons": {
+     "id": "6ad3d4a437b9d44d45946711",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946711/job-coupons"
+    },
+    "payType": "CUSTOMER_PAY",
+    "sublets": {
+     "id": "6ad3d4a437b9d44d45946711",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946711/sublets"
+    },
+    "jobNumber": "4",
+    "operations": {
+     "id": "6ad3d4a437b9d44d45946711",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946711/operations"
+    },
+    "subPayType": "CUSTOMER_PAY",
+    "creationTime": 1792267428336,
+    "modifiedTime": 1792275940229,
+    "completionTime": 1792272002327,
+    "createdByUserId": {
+     "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+     "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+    },
+    "modifiedByUserId": {
+     "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+     "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+    }
+   },
+   "operations": [
+    {
+     "parts": [
+      {
+       "id": 1412059,
+       "core": {
+        "coreAmount": 0,
+        "quantities": [
+         {
+          "type": "CORE",
+          "value": 0
+         }
+        ],
+        "corePartNumber": "84848112",
+        "unitCoreAmount": 0
+       },
+       "fees": {
+        "id": "1412059",
+        "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946711/operations/6ad3d4a437b9d44d45946712/parts/1412059/part-fees"
+       },
+       "type": "PART",
+       "brand": "GM",
+       "causal": false,
+       "status": "DELIVERED",
+       "partName": "84848112 (S) - ELEMENT",
+       "coreReturn": {
+        "quantity": 0,
+        "unitCoreAmount": 0,
+        "coreReturnAmount": 0
+       },
+       "costAmount": 2260,
+       "partNumber": "84848112",
+       "quantities": [
+        {
+         "type": "SALE",
+         "value": 1
+        },
+        {
+         "type": "DELIVERED",
+         "value": 1
+        },
+        {
+         "type": "SOR",
+         "value": 0
+        },
+        {
+         "type": "RESERVED",
+         "value": 0
+        },
+        {
+         "type": "HOLD",
+         "value": 0
+        }
+       ],
+       "saleAmount": 7300,
+       "creationTime": 1792260100287,
+       "modifiedTime": 1792272043134,
+       "unitCostAmount": 2260,
+       "unitSaleAmount": 7300,
+       "createdByUserId": {
+        "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+        "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+       },
+       "eligibleForClaim": true,
+       "modifiedByUserId": {
+        "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+        "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+       }
+      }
+     ],
+     "operation": {
+      "id": "6ad3d4a437b9d44d45946712",
+      "labor": {
+       "costAmount": 0,
+       "saleAmount": 0,
+       "billDuration": 0,
+       "laborAllowanceDuration": 0
+      },
+      "parts": {
+       "id": "6ad3d4a437b9d44d45946712",
+       "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946711/operations/6ad3d4a437b9d44d45946712/parts"
+      },
+      "opcode": "CADAIRFILTER",
+      "oemOpcodes": [
+       {
+        "opcode": "0700"
+       }
+      ],
+      "corrections": [
+       {
+        "id": "4f76f658-53b6-42a7-a09f-46ddbdd55b23",
+        "text": "CLEANED BOX AND INSTALLED NEW FILTER"
+       }
+      ],
+      "creationTime": 1792267428336,
+      "modifiedTime": 1792267428336,
+      "createdByUserId": {
+       "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+       "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+      },
+      "modifiedByUserId": {
+       "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+       "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+      },
+      "opcodeDescription": "REPLACE ENGINE AIR FILTER AND CLEAN AIR BOX",
+      "technicianDetails": {
+       "id": "6ad3d4a437b9d44d45946712",
+       "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946711/operations/6ad3d4a437b9d44d45946712/technicians"
+      },
+      "externalIdentifier": [
+       {
+        "id": null,
+        "number": "1",
+        "source": null,
+        "context": null
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "job": {
+    "id": "6ad3d4a437b9d44d45946715",
+    "fees": {
+     "id": "6ad3d4a437b9d44d45946715",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946715/job-fees"
+    },
+    "hold": false,
+    "tags": [
+     {
+      "type": "SYSTEM",
+      "field": "SERVICE_TYPE_ID",
+      "value": "6296580f9b9717000603058e"
+     },
+     {
+      "type": "SYSTEM",
+      "field": "ADD_ON_REPAIR",
+      "value": "6a8ddd464611173cecf428c5"
+     },
+     {
+      "type": "SYSTEM",
+      "field": "RECOMMENDATION",
+      "value": "6a8ddd464611173cecf428c6"
+     }
+    ],
+    "type": "DEFAULT",
+    "causes": [
+     {
+      "id": "6a483f7ee44be500019ed664",
+      "text": "DIRTY UPON INSPECTION (REFER TO MEDIA)"
+     }
+    ],
+    "status": "CLOSED",
+    "concern": {
+     "text": "REPLACE CABIN AIR FILTER",
+     "type": "NONE"
+    },
+    "coupons": {
+     "id": "6ad3d4a437b9d44d45946715",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946715/job-coupons"
+    },
+    "payType": "CUSTOMER_PAY",
+    "sublets": {
+     "id": "6ad3d4a437b9d44d45946715",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946715/sublets"
+    },
+    "jobNumber": "5",
+    "operations": {
+     "id": "6ad3d4a437b9d44d45946715",
+     "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946715/operations"
+    },
+    "subPayType": "CUSTOMER_PAY",
+    "creationTime": 1792267428336,
+    "modifiedTime": 1792275940229,
+    "completionTime": 1792270233657,
+    "createdByUserId": {
+     "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+     "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+    },
+    "modifiedByUserId": {
+     "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+     "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+    }
+   },
+   "operations": [
+    {
+     "parts": [
+      {
+       "id": 1412060,
+       "core": {
+        "coreAmount": 0,
+        "quantities": [
+         {
+          "type": "CORE",
+          "value": 0
+         }
+        ],
+        "corePartNumber": "13508023",
+        "unitCoreAmount": 0
+       },
+       "fees": {
+        "id": "1412060",
+        "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946715/operations/6ad3d4a437b9d44d45946716/parts/1412060/part-fees"
+       },
+       "type": "PART",
+       "brand": "GM",
+       "causal": false,
+       "status": "DELIVERED",
+       "partName": "13508023 (S) - FILTER",
+       "coreReturn": {
+        "quantity": 0,
+        "unitCoreAmount": 0,
+        "coreReturnAmount": 0
+       },
+       "costAmount": 2939,
+       "partNumber": "13508023",
+       "quantities": [
+        {
+         "type": "SALE",
+         "value": 1
+        },
+        {
+         "type": "DELIVERED",
+         "value": 1
+        },
+        {
+         "type": "SOR",
+         "value": 0
+        },
+        {
+         "type": "RESERVED",
+         "value": 0
+        },
+        {
+         "type": "HOLD",
+         "value": 0
+        }
+       ],
+       "saleAmount": 4115,
+       "creationTime": 1792260102631,
+       "modifiedTime": 1792272064089,
+       "unitCostAmount": 2939,
+       "unitSaleAmount": 4115,
+       "createdByUserId": {
+        "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+        "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+       },
+       "eligibleForClaim": true,
+       "modifiedByUserId": {
+        "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+        "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+       }
+      },
+      {
+       "id": 1412061,
+       "core": {
+        "coreAmount": 0,
+        "quantities": [
+         {
+          "type": "CORE",
+          "value": 0
+         }
+        ],
+        "corePartNumber": "BG7083",
+        "unitCoreAmount": 0
+       },
+       "fees": {
+        "id": "1412061",
+        "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946715/operations/6ad3d4a437b9d44d45946716/parts/1412061/part-fees"
+       },
+       "type": "PART",
+       "brand": "OTHER",
+       "causal": false,
+       "status": "DELIVERED",
+       "partName": "BG7083 - FRIDG FRESH",
+       "coreReturn": {
+        "quantity": 0,
+        "unitCoreAmount": 0,
+        "coreReturnAmount": 0
+       },
+       "costAmount": 35,
+       "partNumber": "BG7083",
+       "quantities": [
+        {
+         "type": "SALE",
+         "value": 1
+        },
+        {
+         "type": "DELIVERED",
+         "value": 1
+        },
+        {
+         "type": "SOR",
+         "value": 0
+        },
+        {
+         "type": "RESERVED",
+         "value": 0
+        },
+        {
+         "type": "HOLD",
+         "value": 0
+        }
+       ],
+       "saleAmount": 1695,
+       "creationTime": 1792260102631,
+       "modifiedTime": 1792272064089,
+       "unitCostAmount": 35,
+       "unitSaleAmount": 1695,
+       "createdByUserId": {
+        "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+        "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+       },
+       "eligibleForClaim": true,
+       "modifiedByUserId": {
+        "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+        "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+       }
+      }
+     ],
+     "operation": {
+      "id": "6ad3d4a437b9d44d45946716",
+      "labor": {
+       "costAmount": 850,
+       "saleAmount": 3000,
+       "billDuration": 1800,
+       "laborAllowanceDuration": 1800
+      },
+      "parts": {
+       "id": "6ad3d4a437b9d44d45946716",
+       "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946715/operations/6ad3d4a437b9d44d45946716/parts"
+      },
+      "opcode": "CABIN",
+      "oemOpcodes": [
+       {
+        "opcode": "0700"
+       }
+      ],
+      "corrections": [
+       {
+        "id": "329428c3-b1ed-4cb6-a172-efbf7bcabbba",
+        "text": "Removed old filter, cleaned cabin filter duct with compressed air, installed new filter and added fridgi"
+       }
+      ],
+      "creationTime": 1792267428336,
+      "modifiedTime": 1792267428336,
+      "createdByUserId": {
+       "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+       "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+      },
+      "modifiedByUserId": {
+       "id": "0657d9b2-1933-435a-bb51-54b05c2926be",
+       "link": "/users/0657d9b2-1933-435a-bb51-54b05c2926be"
+      },
+      "opcodeDescription": "REPLACE CABIN AIR FILTER",
+      "technicianDetails": {
+       "id": "6ad3d4a437b9d44d45946716",
+       "link": "/repair-orders/6ad39f8e764261330689c99e/jobs/6ad3d4a437b9d44d45946715/operations/6ad3d4a437b9d44d45946716/technicians"
+      },
+      "externalIdentifier": [
+       {
+        "id": null,
+        "number": "1",
+        "source": null,
+        "context": null
+       }
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "vehicle": {
+  "id": "6171f704-ef7c-4094-9524-4f7d189b55da",
+  "oem": "gm",
+  "vin": "1GCPSBEK0T1111077",
+  "make": "chevrolet",
+  "year": "2026",
+  "brand": "gm",
+  "model": "Colorado",
+  "stockId": "83929",
+  "mileageIn": 50387,
+  "mileageOut": 50387,
+  "licensePlate": null,
+  "marketClassCategory": "Truck/Van"
+ },
+ "advisorName": "Juan Ramirez",
+ "advisorPersona": null
+}

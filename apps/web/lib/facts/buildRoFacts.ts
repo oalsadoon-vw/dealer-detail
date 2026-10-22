@@ -15,6 +15,10 @@ import "server-only";
  * Classification per operation:
  *   isMenu   = strict factory SERVICE_MENU opcode (TEK<mileage>[BPV][NS]M) OR a
  *              store/global OpcodeCategory row mapped to MENU.
+ *   isMenuSale = isMenu AND laborSale > 0  — the SCORECARD definition (the emailed
+ *              BC/SCT/TOL/BT menu reports skip $0-labor menu lines). RO-level
+ *              hasMenu / menuLines / menuLaborSale / menuPartsSale are computed
+ *              from isMenuSale, so site Menu Sales == scorecard Menu Sales.
  *   category = MENU | ALA | COMMODITY | REC | OTHER
  *   payClass = CP | W | I | O from job.payType.
  */
@@ -132,6 +136,7 @@ export interface BuiltFacts {
     category: string;
     commodityKey: string | null;
     isMenu: boolean;
+    isMenuSale: boolean;
     laborSale: number;
     laborCost: number;
     billHours: number;
@@ -216,6 +221,7 @@ export function buildFactsFromPayload(
       const category = mapping?.category ?? "OTHER";
       if (!mapping && opcode) unclassified.add(opcode);
       const isMenu = category === "MENU";
+      const isMenuSale = isMenu && laborSale > 0;
 
       ops.push({
         jobNumber: job.jobNumber != null ? String(job.jobNumber) : null,
@@ -228,6 +234,7 @@ export function buildFactsFromPayload(
         category,
         commodityKey: mapping?.commodityKey ?? null,
         isMenu,
+        isMenuSale,
         laborSale, laborCost, billHours, partsSale, partsCost, partsQty,
       });
 
@@ -238,7 +245,7 @@ export function buildFactsFromPayload(
       else if (payClass === "W") { r.wLaborSale += laborSale; r.wPartsSale += partsSale; r.wBillHours += billHours; }
       else if (payClass === "I") { r.iLaborSale += laborSale; r.iPartsSale += partsSale; r.iBillHours += billHours; }
       else { r.oLaborSale += laborSale; r.oPartsSale += partsSale; r.oBillHours += billHours; }
-      if (isMenu) { r.menuLines++; r.menuLaborSale += laborSale; r.menuPartsSale += partsSale; }
+      if (isMenuSale) { r.menuLines++; r.menuLaborSale += laborSale; r.menuPartsSale += partsSale; }
       if (category === "ALA") r.hasAla = true;
     }
   }

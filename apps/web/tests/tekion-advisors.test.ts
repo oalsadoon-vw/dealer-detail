@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { extractUserDisplayName } from "../lib/sources/tekion/client";
+import { extractUserDisplayName, extractUserPersona } from "../lib/sources/tekion/client";
 
 // Real shape returned by GET /openapi/v4.0.0/users/{id} (verified live 2026-06-18,
 // dealer americanmotorscorporation_876_0).
@@ -59,5 +59,23 @@ describe("extractUserDisplayName — public OpenAPI /users/{id}", () => {
     expect(extractUserDisplayName({}).name).toBeNull();
     expect(extractUserDisplayName(null).name).toBeNull();
     expect(extractUserDisplayName({ data: { userNameDetails: {} } }).name).toBeNull();
+  });
+});
+
+describe("extractUserPersona — secondary roles (T9 §7)", () => {
+  it("returns SERVICE_ADVISOR when it is only a secondary role", () => {
+    const raw = {
+      data: {
+        userRoleDetails: {
+          primaryRole: { persona: "EMPLOYEE", roleName: "Employee" },
+          secondaryRoles: [{ persona: "SERVICE_ADVISOR", roleName: "ServiceAdvisor" }],
+        },
+      },
+    };
+    expect(extractUserPersona(raw)).toBe("SERVICE_ADVISOR");
+  });
+  it("keeps a fixed-ops primary (manager/director/cashier/clerk/tech) even with a SERVICE_ADVISOR secondary", () => {
+    expect(extractUserPersona({ userRoleDetails: { primaryRole: { persona: "SERVICE_DIRECTOR" }, secondaryRoles: [{ persona: "SERVICE_ADVISOR" }] } })).toBe("SERVICE_DIRECTOR");
+    expect(extractUserPersona({ userRoleDetails: { primaryRole: { persona: "SERVICE_MANAGER" }, secondaryRoles: [{ persona: "CASHIER" }] } })).toBe("SERVICE_MANAGER");
   });
 });

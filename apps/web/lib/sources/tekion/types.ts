@@ -69,6 +69,9 @@ export interface Job {
 export interface OperationLabor {
   saleAmount?: number | null;
   costAmount?: number | null;
+  /** Billed labor time in SECONDS (2880 = 0.80 hr). */
+  billDuration?: number | null;
+  laborAllowanceDuration?: number | null;
 }
 
 export interface Operation {
