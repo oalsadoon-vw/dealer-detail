@@ -255,7 +255,12 @@ export async function getAdvisorPerformance(tc: TenantContext, range: ReportRang
 }
 
 // ---------------------------------------------------------------------------
-// Menu sales (mirrors the Kevin/Tony/Ruben/Sean scorecards: strict TEK menus)
+// Menu sales — SCORECARD definition (Kevin/Tony/Ruben/Sean emailed reports):
+//   a menu SALE is a strict TEK<mileage>[BPV][NS]M operation with labor > 0
+//   (RoOpFact.isMenuSale). RO-level hasMenu/menuLines/menu$ are derived from
+//   the same flag in buildRoFacts, so every menu number on the site ties to
+//   the scorecard RO set. $0-labor menu lines are NOT sales (BC 10/21: 13 of
+//   the 21 site-only ROs were $0-labor; see docs/tickets/T9 §6).
 // ---------------------------------------------------------------------------
 
 export interface MenuAdvisorRow {
@@ -281,7 +286,21 @@ export interface MenuOpcodeRow {
 
 export async function getMenuSales(tc: TenantContext, range: ReportRange) {
   requireStoreAccess(tc, range.storeId);
-  const where = { storeId: range.storeId, ...dateWhere(range) };
+  // Closed basis = status CLOSED only. The scorecard windows on Tekion
+  // closedTime; an INVOICED-not-yet-CLOSED RO has no closedTime, so it is not
+  // in the scorecard until it actually closes (BC 10/21: 7 of 21 site-only ROs).
+  const closedOnly = range.basis !== "opened";
+  const where = {
+    storeId: range.storeId,
+    ...dateWhere(range),
+    ...(closedOnly ? { status: "CLOSED" } : {}),
+  };
+  // RoOpFact carries no status column — apply the same RO filter via relation.
+  const opWhere = {
+    storeId: range.storeId,
+    ...dateWhere(range),
+    ...(closedOnly ? { roFact: { status: "CLOSED" } } : {}),
+  };
   const [allByAdv, menuByAdv, lines, byOpcode, advisors, daily] = await Promise.all([
     prisma.roFact.groupBy({ by: ["advisorId"], where, _count: true }),
     prisma.roFact.groupBy({
@@ -290,10 +309,10 @@ export async function getMenuSales(tc: TenantContext, range: ReportRange) {
       _count: true,
       _sum: { menuLines: true, menuLaborSale: true, menuPartsSale: true },
     }),
-    prisma.roOpFact.count({ where: { ...where, isMenu: true } }),
+    prisma.roOpFact.count({ where: { ...opWhere, isMenuSale: true } }),
     prisma.roOpFact.groupBy({
       by: ["opcode"],
-      where: { ...where, isMenu: true },
+      where: { ...opWhere, isMenuSale: true },
       _count: true,
       _sum: { laborSale: true, partsSale: true },
       orderBy: { _count: { opcode: "desc" } },
@@ -309,7 +328,7 @@ export async function getMenuSales(tc: TenantContext, range: ReportRange) {
     } as any),
   ]);
   const descs = await prisma.roOpFact.findMany({
-    where: { ...where, isMenu: true, opcode: { in: byOpcode.map((o) => o.opcode) } },
+    where: { ...opWhere, isMenuSale: true, opcode: { in: byOpcode.map((o) => o.opcode) } },
     distinct: ["opcode"],
     select: { opcode: true, opcodeDesc: true },
   });

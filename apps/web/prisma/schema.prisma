@@ -550,6 +550,8 @@ model RoOpFact {
   category    String   // MENU | ALA | COMMODITY | REC | OTHER
   commodityKey String?
   isMenu      Boolean @default(false)
+  /// Scorecard definition: isMenu AND laborSale > 0 (a $0-labor menu line is not a menu SALE).
+  isMenuSale  Boolean @default(false)
 
   laborSale Float @default(0)
   laborCost Float @default(0)
@@ -562,6 +564,7 @@ model RoOpFact {
   @@index([storeId, openDate])
   @@index([storeId, opcode])
   @@index([storeId, category, closeDate])
+  @@index([storeId, isMenuSale, closeDate])
   @@index([roFactId])
 }
 

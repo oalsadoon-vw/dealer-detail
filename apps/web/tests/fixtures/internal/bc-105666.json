@@ -1,0 +1,528 @@
+{
+ "header": {
+  "id": "6ad39f8e764261330689c99e",
+  "roNo": "105666",
+  "status": "CLOSED",
+  "previousStatus": "INVOICED",
+  "type": "APPOINTMENT",
+  "source": "APPOINTMENT",
+  "createdTime": 1792254049530,
+  "modifiedTime": 1792275940166,
+  "closedTime": 1792275940076,
+  "firstClosedTime": 1792275940076,
+  "lastInvoicedTime": 1792272072267,
+  "checkinTime": 1792253838454,
+  "promiseTime": 1792263600000,
+  "appointmentDateTime": 1792251900000,
+  "primaryAdvisorId": "0657d9b2-1933-435a-bb51-54b05c2926be",
+  "allAdvisorIds": [
+   "0657d9b2-1933-435a-bb51-54b05c2926be"
+  ],
+  "departmentId": "1251_department_d",
+  "jobCount": 5,
+  "nonVoidedJobCount": 5,
+  "voidedJobCount": 0,
+  "vehicle": {
+   "vin": "1GCPSBEK0T1111077",
+   "year": "2026",
+   "make": "chevrolet",
+   "makeLabel": "Chevrolet",
+   "model": "Colorado",
+   "displayModel": "Colorado",
+   "mileageIn": 50387,
+   "mileageOut": 50387,
+   "oem": "gm",
+   "brand": "gm"
+  }
+ },
+ "jobs": [
+  {
+   "id": "6ad2aec76c10c5fe876beb43",
+   "roId": "6ad39f8e764261330689c99e",
+   "roNo": null,
+   "jobNumber": "1",
+   "status": "OPEN",
+   "internalStatus": "OPEN",
+   "deleted": true,
+   "payType": "CUSTOMER_PAY",
+   "subPayType": "CUSTOMER_PAY",
+   "type": "DEFAULT",
+   "createdTime": 1792253839195,
+   "modifiedTime": 1792253961708,
+   "completedTime": null,
+   "operations": [
+    {
+     "id": "6ad2aec76c10c5fe876beb44",
+     "roId": "6ad39f8e764261330689c99e",
+     "jobId": "6ad2aec76c10c5fe876beb43",
+     "opcode": "GMLOF8",
+     "opcodeDescription": "Change Engine Oil, and Filter for up to 8 quarts. Rotate tires and Install Fuel additive.  Set Tire Pressures, top off all fluids and perform Multi-point inspection as per maintenance schedule.",
+     "operationNumber": "1",
+     "payType": "CUSTOMER_PAY",
+     "deleted": false,
+     "laborAmount": {
+      "amount": 4848,
+      "currency": "USD"
+     },
+     "laborCostAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "billingTimeInSeconds": 2880,
+     "laborTimeInSeconds": 2880,
+     "category": "OIL_CHANGE",
+     "opcodeType": "INDIVIDUAL_SERVICE",
+     "partLineV2s": [],
+     "createdTime": 1792192199064,
+     "modifiedTime": 1792192199064
+    }
+   ],
+   "concern": "Change Engine Oil, and Filter for up to 8 quarts. Rotate tires and Install Fuel additive.  Set Tire Pressures, top off all fluids and perform Multi-point inspection as per maintenance schedule."
+  },
+  {
+   "id": "6ad2aeec41f960db59aaac9e",
+   "roId": "6ad39f8e764261330689c99e",
+   "roNo": null,
+   "jobNumber": "2",
+   "status": "OPEN",
+   "internalStatus": "OPEN",
+   "deleted": true,
+   "payType": "CUSTOMER_PAY",
+   "subPayType": "CUSTOMER_PAY",
+   "type": "DEFAULT",
+   "createdTime": 1792253839195,
+   "modifiedTime": 1792253940528,
+   "completedTime": null,
+   "operations": [
+    {
+     "id": "6ad2aeec41f960db59aaac9f",
+     "roId": "6ad39f8e764261330689c99e",
+     "jobId": "6ad2aeec41f960db59aaac9e",
+     "opcode": "CONCERN",
+     "opcodeDescription": "CUSTOMER STATES",
+     "operationNumber": "1",
+     "payType": "CUSTOMER_PAY",
+     "deleted": false,
+     "laborAmount": {
+      "amount": 40350,
+      "currency": "USD"
+     },
+     "laborCostAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "billingTimeInSeconds": 5400,
+     "laborTimeInSeconds": 5400,
+     "category": "MISCELLANEOUS",
+     "opcodeType": "INDIVIDUAL_SERVICE",
+     "partLineV2s": [],
+     "createdTime": 1792192236881,
+     "modifiedTime": 1792192236881
+    }
+   ],
+   "concern": "wants us to look at the ac its not getting cold "
+  },
+  {
+   "id": "6ad39f8f1f1b3bea57a8ba5c",
+   "roId": "6ad39f8e764261330689c99e",
+   "roNo": null,
+   "jobNumber": "2",
+   "status": "OPEN",
+   "internalStatus": "OPEN",
+   "deleted": true,
+   "payType": "INTERNAL",
+   "subPayType": "INTERNAL",
+   "type": "MPVI",
+   "createdTime": 1792253839790,
+   "modifiedTime": 1792253953763,
+   "completedTime": null,
+   "operations": [
+    {
+     "id": "6ad39f8f1f1b3bea57a8ba5d",
+     "roId": "6ad39f8e764261330689c99e",
+     "jobId": "6ad39f8f1f1b3bea57a8ba5c",
+     "opcode": "MPVI",
+     "opcodeDescription": "PERFORM CERTIFIED MULTI-POINT VEHICLE INSPECTION",
+     "operationNumber": "1",
+     "payType": "INTERNAL",
+     "deleted": false,
+     "laborAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "laborCostAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "billingTimeInSeconds": 0,
+     "laborTimeInSeconds": 0,
+     "category": "MPVI",
+     "opcodeType": "INDIVIDUAL_SERVICE",
+     "partLineV2s": [],
+     "createdTime": 1792253839790,
+     "modifiedTime": 1792253839790
+    }
+   ],
+   "concern": "PERFORM CERTIFIED MULTI-POINT VEHICLE INSPECTION"
+  },
+  {
+   "id": "6ad39f8f1f1b3bea57a8ba61",
+   "roId": "6ad39f8e764261330689c99e",
+   "roNo": null,
+   "jobNumber": "1",
+   "status": "OPEN",
+   "internalStatus": "OPEN",
+   "deleted": true,
+   "payType": "INTERNAL",
+   "subPayType": "INTERNAL",
+   "type": "DEFAULT",
+   "createdTime": 1792253839790,
+   "modifiedTime": 1792253964668,
+   "completedTime": null,
+   "operations": [
+    {
+     "id": "6ad39f8f1f1b3bea57a8ba62",
+     "roId": "6ad39f8e764261330689c99e",
+     "jobId": "6ad39f8f1f1b3bea57a8ba61",
+     "opcode": "TPS",
+     "opcodeDescription": "INSPECT TIRE PRESSURES. ADJUST TO FACTORY SPECS.",
+     "operationNumber": "1",
+     "payType": "INTERNAL",
+     "deleted": false,
+     "laborAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "laborCostAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "billingTimeInSeconds": 0,
+     "laborTimeInSeconds": 0,
+     "category": "TIRE",
+     "opcodeType": "INDIVIDUAL_SERVICE",
+     "partLineV2s": [],
+     "createdTime": 1792253839790,
+     "modifiedTime": 1792253839790
+    }
+   ],
+   "concern": "INSPECT TIRE PRESSURES. ADJUST TO FACTORY SPECS."
+  },
+  {
+   "id": "6ad3a03214cedbcfb936524b",
+   "roId": "6ad39f8e764261330689c99e",
+   "roNo": "105666",
+   "jobNumber": "1",
+   "status": "CLOSED",
+   "internalStatus": "CLOSED",
+   "deleted": false,
+   "payType": "CUSTOMER_PAY",
+   "subPayType": "CUSTOMER_PAY",
+   "type": "SERVICE_MENU",
+   "createdTime": 1792254002415,
+   "modifiedTime": 1792275940229,
+   "completedTime": 1792258493943,
+   "operations": [
+    {
+     "id": "6ad3a03214cedbcfb936524c",
+     "roId": "6ad39f8e764261330689c99e",
+     "jobId": "6ad3a03214cedbcfb936524b",
+     "opcode": "TEK7500BNM",
+     "opcodeDescription": "7500 miles basic normal service menu",
+     "operationNumber": "1",
+     "payType": "CUSTOMER_PAY",
+     "deleted": false,
+     "laborAmount": {
+      "amount": 3312,
+      "currency": "USD"
+     },
+     "laborCostAmount": {
+      "amount": 1700,
+      "currency": "USD"
+     },
+     "billingTimeInSeconds": 3600,
+     "laborTimeInSeconds": 3600,
+     "category": "SERVICE_MENU",
+     "opcodeType": "SERVICE_MENU",
+     "partLineV2s": [
+      {
+       "partId": "M_GM_19432357",
+       "partNumber": null,
+       "resolvedPartName": "19432357 - OIL",
+       "status": "DELIVERED",
+       "deleted": false,
+       "saleQty": 6,
+       "qty": 6,
+       "totalSaleAmount": 4218,
+       "totalCost": 2316,
+       "oemAdjustmentCostPerPart": 0,
+       "createdTime": 1792254050681,
+       "modifiedTime": 1792258471255
+      },
+      {
+       "partId": "b96eda187e294f0fa3a07b0d076594f7",
+       "partNumber": null,
+       "resolvedPartName": "BG9822 - CLASS ACT",
+       "status": "DELIVERED",
+       "deleted": false,
+       "saleQty": 1,
+       "qty": 1,
+       "totalSaleAmount": 1299,
+       "totalCost": 20,
+       "oemAdjustmentCostPerPart": 0,
+       "createdTime": 1792254050681,
+       "modifiedTime": 1792258471255
+      },
+      {
+       "partId": "M_GM_19435370",
+       "partNumber": null,
+       "resolvedPartName": "19435370 - CLEANER",
+       "status": "DELIVERED",
+       "deleted": false,
+       "saleQty": 1,
+       "qty": 1,
+       "totalSaleAmount": 2785,
+       "totalCost": 2119,
+       "oemAdjustmentCostPerPart": 0,
+       "createdTime": 1792254050681,
+       "modifiedTime": 1792258471255
+      },
+      {
+       "partId": "M_GM_19458926",
+       "partNumber": null,
+       "resolvedPartName": "19458926 (S) - FILTER",
+       "status": "DELIVERED",
+       "deleted": false,
+       "saleQty": 1,
+       "qty": 1,
+       "totalSaleAmount": 2900,
+       "totalCost": 580,
+       "oemAdjustmentCostPerPart": 0,
+       "createdTime": 1792255267937,
+       "modifiedTime": 1792258494623
+      }
+     ],
+     "createdTime": 1792254002256,
+     "modifiedTime": 1792254002256
+    }
+   ],
+   "concern": "7500 miles basic normal service menu"
+  },
+  {
+   "id": "6ad3a03b6155930a43d597c8",
+   "roId": "6ad39f8e764261330689c99e",
+   "roNo": "105666",
+   "jobNumber": "2",
+   "status": "CLOSED",
+   "internalStatus": "CLOSED",
+   "deleted": false,
+   "payType": "INTERNAL",
+   "subPayType": "INTERNAL",
+   "type": "MPVI",
+   "createdTime": 1792254011133,
+   "modifiedTime": 1792275940229,
+   "completedTime": 1792258083795,
+   "operations": [
+    {
+     "id": "6ad3a03b6155930a43d597c9",
+     "roId": "6ad39f8e764261330689c99e",
+     "jobId": "6ad3a03b6155930a43d597c8",
+     "opcode": "MPVI",
+     "opcodeDescription": "PERFORM CERTIFIED MULTI-POINT VEHICLE INSPECTION",
+     "operationNumber": "1",
+     "payType": "INTERNAL",
+     "deleted": false,
+     "laborAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "laborCostAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "billingTimeInSeconds": 0,
+     "laborTimeInSeconds": 0,
+     "category": "MPVI",
+     "opcodeType": "INSPECTION",
+     "partLineV2s": [],
+     "createdTime": 1792254011133,
+     "modifiedTime": 1792254011133
+    }
+   ],
+   "concern": "PERFORM CERTIFIED MULTI-POINT VEHICLE INSPECTION"
+  },
+  {
+   "id": "6ad3a040b17fc0789f3d2871",
+   "roId": "6ad39f8e764261330689c99e",
+   "roNo": "105666",
+   "jobNumber": "3",
+   "status": "CLOSED",
+   "internalStatus": "CLOSED",
+   "deleted": false,
+   "payType": "INTERNAL",
+   "subPayType": "INTERNAL",
+   "type": "DEFAULT",
+   "createdTime": 1792254016998,
+   "modifiedTime": 1792275940229,
+   "completedTime": 1792258104365,
+   "operations": [
+    {
+     "id": "6ad3a040b17fc0789f3d2872",
+     "roId": "6ad39f8e764261330689c99e",
+     "jobId": "6ad3a040b17fc0789f3d2871",
+     "opcode": "TPS",
+     "opcodeDescription": "INSPECT TIRE PRESSURES. ADJUST TO FACTORY SPECS.",
+     "operationNumber": "1",
+     "payType": "INTERNAL",
+     "deleted": false,
+     "laborAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "laborCostAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "billingTimeInSeconds": 0,
+     "laborTimeInSeconds": 0,
+     "category": "TIRE",
+     "opcodeType": "INDIVIDUAL_SERVICE",
+     "partLineV2s": [],
+     "createdTime": 1792254016998,
+     "modifiedTime": 1792254016998
+    }
+   ],
+   "concern": "INSPECT TIRE PRESSURES. ADJUST TO FACTORY SPECS."
+  },
+  {
+   "id": "6ad3d4a437b9d44d45946711",
+   "roId": "6ad39f8e764261330689c99e",
+   "roNo": "105666",
+   "jobNumber": "4",
+   "status": "CLOSED",
+   "internalStatus": "CLOSED",
+   "deleted": false,
+   "payType": "CUSTOMER_PAY",
+   "subPayType": "CUSTOMER_PAY",
+   "type": "DEFAULT",
+   "createdTime": 1792267428336,
+   "modifiedTime": 1792275940229,
+   "completedTime": 1792272002327,
+   "operations": [
+    {
+     "id": "6ad3d4a437b9d44d45946712",
+     "roId": "6ad39f8e764261330689c99e",
+     "jobId": "6ad3d4a437b9d44d45946711",
+     "opcode": "CADAIRFILTER",
+     "opcodeDescription": "REPLACE ENGINE AIR FILTER AND CLEAN AIR BOX",
+     "operationNumber": "1",
+     "payType": "CUSTOMER_PAY",
+     "deleted": false,
+     "laborAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "laborCostAmount": {
+      "amount": 0,
+      "currency": "USD"
+     },
+     "billingTimeInSeconds": 0,
+     "laborTimeInSeconds": 0,
+     "category": "FILTERS",
+     "opcodeType": "INDIVIDUAL_SERVICE",
+     "partLineV2s": [
+      {
+       "partId": "M_GM_84848112",
+       "partNumber": null,
+       "resolvedPartName": "84848112 (S) - ELEMENT",
+       "status": "DELIVERED",
+       "deleted": false,
+       "saleQty": 1,
+       "qty": 1,
+       "totalSaleAmount": 7300,
+       "totalCost": 2260,
+       "oemAdjustmentCostPerPart": 0,
+       "createdTime": 1792260100287,
+       "modifiedTime": 1792272043134
+      }
+     ],
+     "createdTime": 1792267428336,
+     "modifiedTime": 1792267428336
+    }
+   ],
+   "concern": "REPLACE ENGINE AIR FILTER AND CLEAN AIR BOX"
+  },
+  {
+   "id": "6ad3d4a437b9d44d45946715",
+   "roId": "6ad39f8e764261330689c99e",
+   "roNo": "105666",
+   "jobNumber": "5",
+   "status": "CLOSED",
+   "internalStatus": "CLOSED",
+   "deleted": false,
+   "payType": "CUSTOMER_PAY",
+   "subPayType": "CUSTOMER_PAY",
+   "type": "DEFAULT",
+   "createdTime": 1792267428336,
+   "modifiedTime": 1792275940229,
+   "completedTime": 1792270233657,
+   "operations": [
+    {
+     "id": "6ad3d4a437b9d44d45946716",
+     "roId": "6ad39f8e764261330689c99e",
+     "jobId": "6ad3d4a437b9d44d45946715",
+     "opcode": "CABIN",
+     "opcodeDescription": "REPLACE CABIN AIR FILTER",
+     "operationNumber": "1",
+     "payType": "CUSTOMER_PAY",
+     "deleted": false,
+     "laborAmount": {
+      "amount": 3000,
+      "currency": "USD"
+     },
+     "laborCostAmount": {
+      "amount": 850,
+      "currency": "USD"
+     },
+     "billingTimeInSeconds": 1800,
+     "laborTimeInSeconds": 1800,
+     "category": "MAINTENANCE",
+     "opcodeType": "INDIVIDUAL_SERVICE",
+     "partLineV2s": [
+      {
+       "partId": "M_GM_13508023",
+       "partNumber": null,
+       "resolvedPartName": "13508023 (S) - FILTER",
+       "status": "DELIVERED",
+       "deleted": false,
+       "saleQty": 1,
+       "qty": 1,
+       "totalSaleAmount": 4115,
+       "totalCost": 2939,
+       "oemAdjustmentCostPerPart": 0,
+       "createdTime": 1792260102631,
+       "modifiedTime": 1792272064089
+      },
+      {
+       "partId": "4532deebb073452f9ba92da946603281",
+       "partNumber": null,
+       "resolvedPartName": "BG7083 - FRIDG FRESH",
+       "status": "DELIVERED",
+       "deleted": false,
+       "saleQty": 1,
+       "qty": 1,
+       "totalSaleAmount": 1695,
+       "totalCost": 35,
+       "oemAdjustmentCostPerPart": 0,
+       "createdTime": 1792260102631,
+       "modifiedTime": 1792272064089
+      }
+     ],
+     "createdTime": 1792267428336,
+     "modifiedTime": 1792267428336
+    }
+   ],
+   "concern": "REPLACE CABIN AIR FILTER"
+  }
+ ]
+}

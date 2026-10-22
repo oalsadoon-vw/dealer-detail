@@ -7,22 +7,35 @@
  *   npm run sync:store -- SCVW 14        # optional window-days override
  * Env:
  *   SYNC_WINDOW_DAYS  — default window (arg 2 wins if both given)
+ *   SYNC_SOURCE       — "internal" (default) | "openapi"
+ *                       internal = Tekion internal API via the logged-in browser
+ *                                  (:9225, TEKION_BROWSER). ~1 call / 50 ROs, no quota.
+ *                       openapi  = legacy public OpenAPI fan-out (~12 calls / RO,
+ *                                  1,500 calls / 15 min APP-WIDE). Fallback only.
  *
- * Tekion rate limit is 1500 calls / 15 min APP-WIDE (shared across all
- * dealers) — keep windows small; the all-stores runner (sync-all.ts)
- * spaces stores out for this reason.
+ * There is deliberately NO automatic fallback from internal → openapi: if the
+ * browser is logged out the run FAILS loudly (BrowserNotAuthenticated) and the
+ * Sync page / stale-store alert surface it. Silent fallback hid 3 outages.
  */
 
 import { readFileSync } from "node:fs";
 
 import { prisma } from "../lib/db";
 import { collectRepairOrders } from "../lib/sources/tekion/collector";
+import { collectRepairOrdersInternal } from "../lib/sources/tekion/internal/collector";
 import { aggregateMetrics } from "../lib/aggregate/aggregator";
 import { buildRoFacts } from "../lib/facts/buildRoFacts";
 import { TekionRateLimitError } from "../lib/sources/tekion/client";
 
 const STALE_RUN_MINUTES = 30;
 const DEFAULT_WINDOW_DAYS = 3;
+
+export type SyncSource = "internal" | "openapi";
+export function resolveSyncSource(): SyncSource {
+  const v = (process.env.SYNC_SOURCE ?? "internal").trim().toLowerCase();
+  if (v === "openapi" || v === "internal") return v;
+  throw new Error(`SYNC_SOURCE must be "internal" or "openapi" (got "${v}")`);
+}
 
 /** Optional per-store advisor seed caches (id -> name), used as warm-start only. */
 const ADVISOR_SEED_PATHS: Record<string, string> = {
@@ -84,24 +97,36 @@ export async function syncStore(abbrev: string, windowDays: number): Promise<{
   const dateField =
     (process.env.SYNC_DATE_FIELD as "creationTime" | "modifiedTime" | undefined) ??
     "modifiedTime";
+  const source = resolveSyncSource();
   console.log(
-    `\n=== sync ${abbrev} (“${store.name}”, dealer ${store.tekionDealerId}) window=${windowDays}d field=${dateField} ===`,
+    `\n=== sync ${abbrev} (“${store.name}”, dealer ${store.tekionDealerId}) window=${windowDays}d field=${dateField} source=${source} ===`,
   );
 
   let rateLimited = false;
   let collectResult: Awaited<ReturnType<typeof collectRepairOrders>> | null = null;
   try {
-    collectResult = await collectRepairOrders({
-      storeId: store.id,
-      tekionDealerId: store.tekionDealerId,
-      windowStart,
-      windowEnd: now,
-      kind: "MANUAL",
-      dateField,
-      advisorResolverOptions: { seed: loadAdvisorSeed(abbrev) },
-    });
+    collectResult =
+      source === "internal"
+        ? await collectRepairOrdersInternal({
+            storeId: store.id,
+            tekionDealerId: store.tekionDealerId,
+            windowStart,
+            windowEnd: now,
+            kind: "MANUAL",
+            onProgress: (p) =>
+              console.log(`${abbrev}   … ${p.seen}/${p.total} headers, written=${p.written} skipped=${p.skipped}`),
+          })
+        : await collectRepairOrders({
+            storeId: store.id,
+            tekionDealerId: store.tekionDealerId,
+            windowStart,
+            windowEnd: now,
+            kind: "MANUAL",
+            dateField,
+            advisorResolverOptions: { seed: loadAdvisorSeed(abbrev) },
+          });
     console.log(
-      `${abbrev} collect: fetched=${collectResult.rosFetched} created=${collectResult.created} updated=${collectResult.updated} unchanged=${collectResult.unchanged} skippedFanOut=${collectResult.skippedFanOut} apiCalls=${collectResult.apiCallCount}`,
+      `${abbrev} collect[${source}]: fetched=${collectResult.rosFetched} created=${collectResult.created} updated=${collectResult.updated} unchanged=${collectResult.unchanged} skippedFanOut=${collectResult.skippedFanOut} apiCalls=${collectResult.apiCallCount} status=${collectResult.status}`,
     );
   } catch (err) {
     if (err instanceof TekionRateLimitError) {

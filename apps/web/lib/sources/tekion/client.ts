@@ -1,4 +1,5 @@
 import "server-only";
+import { effectivePersona } from "./internal/client";
 
 /**
  * Tekion OpenAPI client (server-only).
@@ -545,13 +546,21 @@ export function extractUserPersona(raw: unknown): string | null {
   for (const obj of candidates) {
     const urd = obj.userRoleDetails;
     if (urd && typeof urd === "object") {
-      const primary = (urd as Record<string, unknown>).primaryRole;
+      const u = urd as Record<string, unknown>;
+      const personas: string[] = [];
+      const primary = u.primaryRole;
       if (primary && typeof primary === "object") {
         const persona = (primary as Record<string, unknown>).persona;
-        if (typeof persona === "string" && persona.trim()) {
-          return persona.trim();
-        }
+        if (typeof persona === "string" && persona.trim()) personas.push(persona.trim());
       }
+      const secondary = Array.isArray(u.secondaryRoles) ? (u.secondaryRoles as Array<Record<string, unknown>>) : [];
+      for (const sr of secondary) {
+        const persona = sr?.persona;
+        if (typeof persona === "string" && persona.trim()) personas.push(persona.trim());
+      }
+      // T9 §7 — same rule as internal/client.ts effectivePersona().
+      const p = effectivePersona(personas);
+      if (p) return p;
     }
   }
   return null;
