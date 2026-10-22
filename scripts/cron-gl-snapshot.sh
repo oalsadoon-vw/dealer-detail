@@ -28,7 +28,7 @@ echo "===== $(date -Is) GL snapshot START ====="
 # Browser must be logged in; if not, say so loudly and exit non-zero so the
 # gap shows in the log (Jay re-auths :9225 via restore_9223_session-style flow).
 if ! curl -sf -m 10 -X POST "$GL_BROWSER/eval" -H 'Content-Type: application/json' \
-     -d '{"js":"(()=>String(!!localStorage.t_token && /tekioncloud\\.com/.test(location.href)))()"}' | grep -q '"true"'; then
+     -d '{"js":"(()=>String(!!localStorage.t_token && location.hostname===\"app.tekioncloud.com\"))()"}' | grep -q '"true"'; then
   echo "===== $(date -Is) GL snapshot SKIPPED: $GL_BROWSER not logged into Tekion ====="
   exit 2
 fi
