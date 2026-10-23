@@ -82,6 +82,13 @@ export function payClassOf(payType: unknown): "CP" | "W" | "I" | "O" {
   const p = String(payType ?? "").toUpperCase();
   if (!p) return "O";
   if (p.startsWith("CUSTOMER") || p === "CP" || p === "RETAIL") return "CP";
+  // Service-contract sub-pay-types. Tekion's header paySplitTotalsV3 rolls
+  // CVSC (vehicle service contract) / CEOM (OEM extended) into cpAmounts.
+  // These appear as job.splitInfo.splits[].subPayType on split-pay jobs
+  // (the job itself is payType=CUSTOMER_PAY, subPayType=CVSC). Measured
+  // 2026-10-23 Jan 2026: TOL CP −$68,076 == Σ CVSC ops exactly, BC −$18,569,
+  // ARSJ −$3,143 — all "O"-class before this mapping.
+  if (p === "CVSC" || p === "CEOM" || p === "SERVICE_CONTRACT" || p === "EXTENDED_SERVICE_CONTRACT") return "CP";
   if (p.startsWith("WARRANTY") || p === "W" || p === "EXTENDED_WARRANTY") return "W";
   if (p.startsWith("INTERNAL") || p === "I") return "I";
   return "O";

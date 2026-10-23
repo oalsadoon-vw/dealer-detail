@@ -62,14 +62,27 @@ export function partNumberOf(p: InternalPartLine): string | null {
 }
 
 /**
- * Cost in cents = totalCost as-is. Tekion's own pay-type cost totals
- * (paySplitTotalsV3.*.partCostAmount) are Σ partLine.totalCost with NO
- * oemAdjustmentCostPerPart netting (BC RO 105246: 31 lines Σ totalCost
- * 187185 == header partCostAmount 187185, lifter line adj 1584×16 NOT
- * subtracted). The earlier adj×qty subtraction under-stated W cost by $459
- * fleet-wide for Oct 1–22 2026.
+ * Cost in cents, matching Tekion's own pay-type cost totals
+ * (paySplitTotalsV3.*.partCostAmount):
+ *
+ *   saleQty > 0  →  costPricePerPart × saleQty
+ *   saleQty = 0  →  totalCost (returned / unsold lines still carry cost)
+ *
+ * NOT plain totalCost: on older ROs (Jan–Jun 2026) partLine.totalCost is
+ * frequently stale/under-stated vs costPricePerPart×saleQty — e.g. VWC RO
+ * 136275 (Jan 2026): line 06L115562B costPP 1029 × qty 1 but totalCost 1029
+ * ties, while line G 54001QS0 costPP 72 × saleQty 58 = 4176 vs totalCost 72;
+ * header partCostAmount 5573 == Σ costPP×saleQty, ≠ Σ totalCost 1469.
+ * Measured 2026-10-23 over 420 closed ROs (VWC/BC/TOL/SCVW/ARSJ, Jan–Oct):
+ * this formula ties the header on 420/420; Σ totalCost ties only on recent
+ * months (VWC Jan 24/80, BC Jan 20/60, ARSJ 43/60, TOL Jan 42/60).
+ * NO oemAdjustmentCostPerPart netting (BC RO 105246: 31 lines, adj 1584×16
+ * not subtracted by Tekion).
  */
 export function partCostCents(p: InternalPartLine): number {
+  const saleQty = num(p.saleQty) ?? 0;
+  const costPP = num(p.costPricePerPart);
+  if (saleQty > 0 && costPP != null) return Math.round(costPP * saleQty);
   return Math.round(num(p.totalCost) ?? 0);
 }
 
@@ -170,6 +183,9 @@ function paySplitsOf(j: InternalJob): PaySplit[] | null {
   const raw = si && Array.isArray(si.splits) ? (si.splits as Array<Record<string, unknown>>) : [];
   const splits: PaySplit[] = raw
     .map((s) => ({
+      // Split rows carry ONLY subPayType (CUSTOMER_PAY/WARRANTY/INTERNAL/CVSC/CEOM…).
+      // CVSC/CEOM (service-contract payers) are CP sub-types — Tekion rolls them into
+      // cpAmounts; payClassOf() in buildRoFacts maps them to "CP".
       payType: String(s.subPayType ?? s.payType ?? "").toUpperCase(),
       payerId: str(s.payerId),
       components: Array.isArray(s.components) ? (s.components as SplitComponent[]) : [],

@@ -49,6 +49,19 @@ async function main() {
     });
     const byId = new Map(facts.map((f) => [f.documentId, f]));
     const ids = facts.map((f) => f.documentId);
+    // MISSING sweep: ROs Tekion says are CLOSED in the window but the site has
+    // no RoFact for at all (ARSJ Jan 2026: Tekion 121 closed, site 120 — RO
+    // 696fc870… never ingested, $725 CP). The mismatch loop below can only see
+    // ROs we already hold, so list Tekion's closed set independently.
+    const missing: string[] = [];
+    {
+      const fromMs = FROM.getTime(), toMs = TO.getTime(); let start = 0;
+      for (;;) {
+        const r = await client.rawRoSearch(dealer, { pageInfo: { start, rows: 200 }, sort: [{ order: "ASC", field: "closedTime" }], searchText: null, filters: [{ operator: "IN", values: ["CLOSED"], field: "status" }, { operator: "GTE", values: [String(fromMs)], field: "closedTime" }, { operator: "LTE", values: [String(toMs)], field: "closedTime" }], searchFields: ["RO_NO"] });
+        for (const h of r.list as any[]) if (!byId.has(h.id)) missing.push(h.id);
+        if (r.list.length < 200) break; start += 200;
+      }
+    }
     // per-pay-class COST lives on RoOpFact (RoFact has only total cost)
     const costRows = facts.length ? await prisma.roOpFact.groupBy({ by: ["roFactId", "payClass"], where: { storeId: s.id, roFactId: { in: facts.map((f) => f.id) } }, _sum: { laborCost: true, partsCost: true } }) : [];
     const costBy = new Map<string, Record<string, number>>();
@@ -71,8 +84,9 @@ async function main() {
         if ([...dS, ...dC].some((x) => Math.abs(x) > 2)) mismatch.push({ id: h.id, ro: String(h.roNo), d: `sale CP ${dS[0]} W ${dS[1]} I ${dS[2]} | cost CP ${dC[0]} W ${dC[1]} I ${dC[2]}` });
       }
     }
-    console.log(`${ab}: scanned ${ids.length} ROs, pay-type mismatches ${mismatch.length}${DRY ? " (dry)" : ""}`);
+    console.log(`${ab}: scanned ${ids.length} ROs, pay-type mismatches ${mismatch.length}, missing-from-site ${missing.length}${DRY ? " (dry)" : ""}`);
     for (const m of mismatch.slice(0, 30)) console.log(`   RO ${m.ro}: ${m.d}`);
+    for (const id of missing) mismatch.push({ id, ro: id, d: "MISSING (closed in Tekion, no RoFact)" });
     if (DRY || mismatch.length === 0) { grand.push(`${ab} ${mismatch.length} mismatches`); continue; }
 
     const run = await prisma.syncRun.create({ data: { storeId: s.id, kind: "MANUAL", windowStart: FROM, windowEnd: TO, status: "RUNNING" } });
@@ -99,7 +113,7 @@ async function main() {
     const fb = await buildRoFacts({ storeId: s.id, documentIds: mids });
     await prisma.syncRun.update({ where: { id: run.id }, data: { status: failed ? "COMPLETED_WITH_WARNINGS" : "COMPLETED", finishedAt: new Date(), summary: { source: "refanout-split", fixed, hollow, failed } } });
     console.log(`${ab}: fixed=${fixed} hollow=${hollow} failed=${failed} facts rebuilt ros=${fb.rosBuilt} ops=${fb.opsBuilt}`);
-    grand.push(`${ab} ${mismatch.length} mismatches → fixed ${fixed}`);
+    grand.push(`${ab} ${mismatch.length - missing.length} mismatches + ${missing.length} missing → fixed ${fixed}`);
   }
   console.log("SUMMARY: " + grand.join(" | "));
 }
