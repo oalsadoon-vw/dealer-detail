@@ -51,4 +51,13 @@ if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
 else
   echo "===== $(date -Is) nightly sync DONE (rc=$rc) ====="
 fi
+
+# Self-heal pay-type/cost drift: compare every stored RO in the trailing 45 days
+# against Tekion's header paySplitTotalsV3 (sale+cost per CP/W/I) and re-pull
+# the mismatches. Catches (a) split-pay jobs, (b) part cost posted AFTER the RO's
+# modifiedTime (the "unchanged" skip would otherwise freeze $0 cost forever).
+# Header-only detection: ~1 browser call per 200 ROs; zero OpenAPI quota.
+FROM45=$(date -d '45 days ago' +%F); TO=$(date +%F)
+echo "===== $(date -Is) pay-type/cost drift sweep ${FROM45}..${TO} ====="
+timeout -k 30 1800 npx tsx --conditions=react-server scripts/refanout-split.ts --from "$FROM45" --to "$TO" 2>&1 | grep -v TS18028 | grep -E "mismatches|fixed=|SUMMARY|Error"
 exit "$rc"

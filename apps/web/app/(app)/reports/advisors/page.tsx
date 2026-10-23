@@ -13,6 +13,8 @@ type Row = {
   laborSale: number; laborGross: number; partsSale: number; partsGross: number;
   totalSale: number; totalGross: number; billHours: number; elr: number; hoursPerRo: number; salePerRo: number;
   menuRos: number; menuPenetration: number; cpLaborSale: number; wLaborSale: number; iLaborSale: number;
+  cpGross: number; wGross: number; iGross: number; oGross: number; cpLaborGross: number; cpPartsGross: number;
+  byPayType: unknown;
 };
 type Resp = { rows: Row[] };
 
@@ -26,7 +28,8 @@ export default function AdvisorsPage() {
     roCount: t.roCount + r.roCount, closedCount: t.closedCount + r.closedCount, cpRoCount: t.cpRoCount + r.cpRoCount,
     laborSale: t.laborSale + r.laborSale, laborGross: t.laborGross + r.laborGross, partsSale: t.partsSale + r.partsSale, partsGross: t.partsGross + r.partsGross,
     totalSale: t.totalSale + r.totalSale, totalGross: t.totalGross + r.totalGross, billHours: t.billHours + r.billHours, menuRos: t.menuRos + r.menuRos,
-  }), { roCount: 0, closedCount: 0, cpRoCount: 0, laborSale: 0, laborGross: 0, partsSale: 0, partsGross: 0, totalSale: 0, totalGross: 0, billHours: 0, menuRos: 0 }), [rows]);
+    cpGross: t.cpGross + r.cpGross, wGross: t.wGross + r.wGross, iGross: t.iGross + r.iGross, oGross: t.oGross + r.oGross,
+  }), { roCount: 0, closedCount: 0, cpRoCount: 0, laborSale: 0, laborGross: 0, partsSale: 0, partsGross: 0, totalSale: 0, totalGross: 0, billHours: 0, menuRos: 0, cpGross: 0, wGross: 0, iGross: 0, oGross: 0 }), [rows]);
 
   const columns: Column<Row>[] = [
     { key: "name", header: "Advisor", cell: (r) => <span className="font-medium">{r.name}{r.persona && r.persona !== "SERVICE_ADVISOR" ? <span className="ml-1 text-[10px] text-fg-subtle">{r.persona.replace(/_/g, " ").toLowerCase()}</span> : null}</span>, sortable: true, sortValue: (r) => r.name, sticky: true },
@@ -39,7 +42,10 @@ export default function AdvisorsPage() {
     { key: "partsSale", header: "Parts sale", cell: (r) => fmtMoney(r.partsSale), sortable: true, sortValue: (r) => r.partsSale, align: "right" },
     { key: "totalSale", header: "Total sale", cell: (r) => <span className="font-medium">{fmtMoney(r.totalSale)}</span>, sortable: true, sortValue: (r) => r.totalSale, align: "right" },
     { key: "salePerRo", header: "Sale/RO", cell: (r) => fmtMoney(r.salePerRo), sortable: true, sortValue: (r) => r.salePerRo, align: "right", hideOnMobile: true },
-    { key: "totalGross", header: "RO gross", cell: (r) => fmtMoney(r.totalGross), sortable: true, sortValue: (r) => r.totalGross, align: "right", hideOnMobile: true },
+    { key: "cpGross", header: "CP gross", cell: (r) => <span title={`labor ${fmtMoney(r.cpLaborGross)} · parts ${fmtMoney(r.cpPartsGross)}`}>{fmtMoney(r.cpGross)}</span>, sortable: true, sortValue: (r) => r.cpGross, align: "right" },
+    { key: "wGross", header: "Warr gross", cell: (r) => fmtMoney(r.wGross), sortable: true, sortValue: (r) => r.wGross, align: "right", hideOnMobile: true },
+    { key: "iGross", header: "Int gross", cell: (r) => fmtMoney(r.iGross), sortable: true, sortValue: (r) => r.iGross, align: "right", hideOnMobile: true },
+    { key: "totalGross", header: "Total gross", cell: (r) => <span className="font-medium" title={r.oGross ? `includes ${fmtMoney(r.oGross)} other/service-plan` : undefined}>{fmtMoney(r.totalGross)}</span>, sortable: true, sortValue: (r) => r.totalGross, align: "right" },
     { key: "menuPenetration", header: "Menu %", cell: (r) => <span title={`${r.menuRos} menu ROs`}>{fmtPct(r.menuPenetration, 0)}</span>, sortable: true, sortValue: (r) => r.menuPenetration, align: "right" },
   ];
 
@@ -66,9 +72,9 @@ export default function AdvisorsPage() {
         <div className="flex items-center justify-between p-4 pb-2">
           <CardHeader>
             <CardTitle>Advisor performance</CardTitle>
-            <CardDescription>{fmtNum(totals.roCount)} ROs · {fmtNum(totals.billHours, 1)} hrs · {fmtMoney(totals.totalSale)} · ELR {totals.billHours ? fmtMoney(totals.laborSale / totals.billHours, 2) : "—"} · menu {totals.roCount ? fmtPct((totals.menuRos / totals.roCount) * 100, 0) : "—"}</CardDescription>
+            <CardDescription>{fmtNum(totals.roCount)} ROs · {fmtNum(totals.billHours, 1)} hrs · {fmtMoney(totals.totalSale)} sale · ELR {totals.billHours ? fmtMoney(totals.laborSale / totals.billHours, 2) : "—"} · menu {totals.roCount ? fmtPct((totals.menuRos / totals.roCount) * 100, 0) : "—"}<br />Gross: CP {fmtMoney(totals.cpGross)} · Warranty {fmtMoney(totals.wGross)} · Internal {fmtMoney(totals.iGross)}{totals.oGross ? ` · Other ${fmtMoney(totals.oGross)}` : ""} · <span className="font-medium">Total {fmtMoney(totals.totalGross)}</span> ({f.basis === "closed" ? "CLOSED ROs by close date" : "ROs by open date"}; gross = sale − cost, labor + parts)</CardDescription>
           </CardHeader>
-          <Button size="sm" variant="subtle" onClick={() => downloadCsv(`${store?.abbreviation ?? "store"}-advisors-${f.basis}-${f.startDate}_${f.endDate}.csv`, toCsv(rows.map(({ advisorId: _a, ...r }) => r)))}>Export CSV</Button>
+          <Button size="sm" variant="subtle" onClick={() => downloadCsv(`${store?.abbreviation ?? "store"}-advisors-${f.basis}-${f.startDate}_${f.endDate}.csv`, toCsv(rows.map(({ advisorId: _a, byPayType: _b, ...r }) => r)))}>Export CSV</Button>
         </div>
         <DataTable<Row> columns={columns} rows={rows} keyField={(r) => r.advisorId || r.name} initialSort={{ key: "totalSale", dir: "desc" }} density="compact" />
       </Card>

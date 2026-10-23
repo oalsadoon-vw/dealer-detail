@@ -189,14 +189,17 @@ export function buildFactsFromPayload(
     const job = j?.job ?? j ?? {};
     const jStatus = String(job.status ?? "").toUpperCase();
     if (jStatus === "VOIDED" || jStatus === "VOID" || jStatus === "DELETED") continue;
-    const payType: string | null = job.payType ?? null;
-    const payClass = payClassOf(payType);
+    const jobPayType: string | null = job.payType ?? null;
     const opsRaw: any[] = Array.isArray(j?.operations)
       ? j.operations
       : Array.isArray(job?.operations) ? job.operations : [];
 
     for (const o of opsRaw) {
       const op = o?.operation ?? o ?? {};
+      // Split-pay jobs: the internal mapper emits one pseudo-op per payer with
+      // splitPayType set (see mapper.ts splitOperation). Otherwise the job's payType.
+      const payType: string | null = (op.splitPayType as string | null) ?? jobPayType;
+      const payClass = payClassOf(payType);
       const parts: any[] = Array.isArray(o?.parts) ? o.parts : Array.isArray(op?.parts) ? op.parts : [];
       const opcode = normalizeOpcode(op.opcode ?? job.opcode ?? null);
 

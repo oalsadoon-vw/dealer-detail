@@ -61,22 +61,31 @@ export function partNumberOf(p: InternalPartLine): string | null {
   return null;
 }
 
-/** Cost in cents, net of OEM adjustment (OpenAPI reports the post-adjustment cost). */
+/**
+ * Cost in cents = totalCost as-is. Tekion's own pay-type cost totals
+ * (paySplitTotalsV3.*.partCostAmount) are Σ partLine.totalCost with NO
+ * oemAdjustmentCostPerPart netting (BC RO 105246: 31 lines Σ totalCost
+ * 187185 == header partCostAmount 187185, lifter line adj 1584×16 NOT
+ * subtracted). The earlier adj×qty subtraction under-stated W cost by $459
+ * fleet-wide for Oct 1–22 2026.
+ */
 export function partCostCents(p: InternalPartLine): number {
-  const total = num(p.totalCost) ?? 0;
-  const adj = num(p.oemAdjustmentCostPerPart) ?? 0;
-  const qty = num(p.saleQty) ?? num(p.qty) ?? 0;
-  return Math.round(total - adj * qty);
+  return Math.round(num(p.totalCost) ?? 0);
 }
 
 export function mapPart(p: InternalPartLine): Part {
   const qty = num(p.saleQty) ?? num(p.qty) ?? 0;
+  // Sale INCLUDES the core charge: Tekion's own pay-type totals
+  // (paySplitTotalsV3.*.partsAmount) are built from totalSaleWithCore
+  // (BC RO 104817: totalSaleAmount 29995 + core 900 = partsAmount 30895).
+  const withCore = num((p as { totalSaleWithCore?: unknown }).totalSaleWithCore);
+  const sale = withCore ?? ((num(p.totalSaleAmount) ?? 0) + (num((p as { totalCoreAmount?: unknown }).totalCoreAmount) ?? 0));
   return {
     id: (p as { id?: unknown }).id as string | undefined,
     partNumber: partNumberOf(p),
     partName: str(p.resolvedPartName),
     status: str(p.status),
-    saleAmount: Math.round(num(p.totalSaleAmount) ?? 0),
+    saleAmount: Math.round(sale),
     costAmount: partCostCents(p),
     quantities: [{ type: "SALE", value: qty }],
     creationTime: ms(p.createdTime),
@@ -109,9 +118,13 @@ export function mapOperation(o: InternalOperation): { operation: Operation; part
 }
 
 export function mapJob(j: InternalJob): { job: Job; operations: Array<{ operation: Operation; parts: Part[] }> } {
-  const ops = (Array.isArray(j.operations) ? j.operations : [])
+  const rawOps = (Array.isArray(j.operations) ? j.operations : [])
     .filter((o) => o && o.deleted !== true)
-    .map(mapOperation);
+    .map((o) => ({ raw: o, ...mapOperation(o) }));
+  const splits = paySplitsOf(j);
+  const ops: Array<{ operation: Operation; parts: Part[] }> = splits
+    ? rawOps.flatMap((o) => splitOperation(o.raw, o.operation, o.parts, splits, str(j.payType)))
+    : rawOps.map(({ operation, parts }) => ({ operation, parts }));
   const job: Job = {
     id: j.id,
     jobNumber: j.jobNumber != null ? String(j.jobNumber) : null,
@@ -123,8 +136,121 @@ export function mapJob(j: InternalJob): { job: Job; operations: Array<{ operatio
     creationTime: ms(j.createdTime),
     modifiedTime: ms(j.modifiedTime),
     completionTime: ms(j.completedTime),
+    ...(splits ? { splitJob: true, splitPayTypes: splits.map((s) => s.payType) } : {}),
   };
   return { job, operations: ops };
+}
+
+// ---------------------------------------------------------------------------
+// Split-pay jobs.
+//
+// A job carries ONE primary payType, but Tekion can split it across payers
+// (job.splitInfo.splits[] — e.g. BST RO 156035 job 6: payType WARRANTY, 93.07%
+// billed CUSTOMER_PAY). Tekion's own pay-type totals (header paySplitTotalsV3
+// cp/wp/ipAmounts) allocate by that split; attributing the whole op to the
+// primary payer mis-states CP vs W by the split amount (fleet Oct 1–22 2026:
+// BST ±$9.4K, BC ±$5.3K, TOL ±$1.4K — totals tie, pay-type mix doesn't).
+//
+// Allocation uses splitInfo component rows:
+//   LABOR  componentId = operation.id             → splitAmount (cents, exact)
+//   PARTS  componentId = partLine.servicePartItemId → splitAmount (cents, exact)
+//   OPERATION componentId = operation.id          → fallback % when no LABOR row
+// Cost is scaled by the same share (splitAmount / amountToSplit). Billed hours
+// stay on the primary payer — that is what Tekion does (cpAmounts.
+// totalBillingTimeInSeconds excludes the split-in share).
+// Each payer gets its own pseudo-operation (id "<opId>#<PAYTYPE>") with
+// `splitPayType` set; facts read splitPayType ?? job.payType.
+// ---------------------------------------------------------------------------
+
+interface SplitComponent { component?: string; componentId?: string; splitPercentage?: number; splitAmount?: number; amountToSplit?: number }
+interface PaySplit { payType: string; payerId: string | null; components: SplitComponent[] }
+
+function paySplitsOf(j: InternalJob): PaySplit[] | null {
+  const si = j.splitInfo as { splits?: unknown } | null | undefined;
+  const raw = si && Array.isArray(si.splits) ? (si.splits as Array<Record<string, unknown>>) : [];
+  const splits: PaySplit[] = raw
+    .map((s) => ({
+      payType: String(s.subPayType ?? s.payType ?? "").toUpperCase(),
+      payerId: str(s.payerId),
+      components: Array.isArray(s.components) ? (s.components as SplitComponent[]) : [],
+    }))
+    .filter((s) => s.payType);
+  // Only a REAL split (≥2 payers) changes anything; single-payer splitInfo is the normal case.
+  const distinct = new Set(splits.map((s) => s.payType));
+  return distinct.size >= 2 ? splits : null;
+}
+
+/** Share (0..1) of a component for one payer: exact cents ratio when present, else percentage. */
+function shareOf(c: SplitComponent | undefined): number | null {
+  if (!c) return null;
+  const amt = num(c.splitAmount), tot = num(c.amountToSplit);
+  if (amt !== null && tot !== null && tot > 0) return Math.max(0, Math.min(1, amt / tot));
+  const pct = num(c.splitPercentage);
+  if (pct !== null) return Math.max(0, Math.min(1, pct / 100));
+  return null;
+}
+
+function splitOperation(
+  raw: InternalOperation,
+  op: Operation,
+  parts: Part[],
+  splits: PaySplit[],
+  primaryPayType: string | null,
+): Array<{ operation: Operation; parts: Part[] }> {
+  const primary = (primaryPayType ?? "").toUpperCase();
+  const rawParts = (Array.isArray(raw.partLineV2s) ? raw.partLineV2s : []).filter((p) => p && p.deleted !== true);
+  const laborSale = op.labor?.saleAmount ?? 0, laborCost = op.labor?.costAmount ?? 0;
+
+  // Per-payer shares, with an "allocated so far" tracker so the last payer absorbs rounding.
+  const out: Array<{ operation: Operation; parts: Part[] }> = [];
+  let laborSaleLeft = laborSale, laborCostLeft = laborCost;
+  const partSaleLeft = parts.map((p) => p.saleAmount ?? 0), partCostLeft = parts.map((p) => p.costAmount ?? 0);
+
+  splits.forEach((sp, idx) => {
+    const last = idx === splits.length - 1;
+    const byId = (comp: string, id: string | null | undefined) => sp.components.find((c) => c.component === comp && id != null && String(c.componentId) === String(id));
+    const opShare = shareOf(byId("LABOR", op.id)) ?? shareOf(byId("OPERATION", op.id)) ?? (sp.payType === primary ? 1 : 0);
+
+    const lSale = last ? laborSaleLeft : Math.round(laborSale * opShare);
+    const lCost = last ? laborCostLeft : Math.round(laborCost * opShare);
+    laborSaleLeft -= lSale; laborCostLeft -= lCost;
+
+    const spParts: Part[] = [];
+    parts.forEach((p, pi) => {
+      const rp = rawParts[pi];
+      const key = rp ? (str(rp.servicePartItemId as unknown) ?? str(rp.partFulfilmentLineItemId as unknown) ?? str(rp.orderId as unknown)) : null;
+      const pShare = shareOf(byId("PARTS", key)) ?? opShare;
+      const pSale = last ? partSaleLeft[pi]! : Math.round((p.saleAmount ?? 0) * pShare);
+      const pCost = last ? partCostLeft[pi]! : Math.round((p.costAmount ?? 0) * pShare);
+      partSaleLeft[pi]! -= pSale; partCostLeft[pi]! -= pCost;
+      if (pSale === 0 && pCost === 0 && sp.payType !== primary) return;
+      spParts.push({ ...p, saleAmount: pSale, costAmount: pCost, ...(sp.payType !== primary ? { quantities: [{ type: "SALE", value: 0 }], splitShare: pShare } : { splitShare: pShare }) });
+    });
+
+    const isPrimary = sp.payType === primary;
+    if (!isPrimary && lSale === 0 && lCost === 0 && spParts.length === 0) return;
+    out.push({
+      operation: {
+        ...op,
+        id: isPrimary ? op.id : `${op.id}#${sp.payType}`,
+        payType: sp.payType,
+        splitPayType: sp.payType,
+        splitPayerId: sp.payerId,
+        splitOf: op.id,
+        labor: {
+          ...op.labor,
+          saleAmount: lSale,
+          costAmount: lCost,
+          // hours stay with the primary payer (matches Tekion paySplitTotalsV3.totalBillingTimeInSeconds)
+          billDuration: isPrimary ? op.labor?.billDuration ?? 0 : 0,
+          laborAllowanceDuration: isPrimary ? op.labor?.laborAllowanceDuration ?? null : null,
+        },
+      } as Operation,
+      parts: spParts,
+    });
+  });
+  // Safety: if the primary payer somehow wasn't in the split list, keep the original op whole.
+  return out.length ? out : [{ operation: op, parts }];
 }
 
 function schedule(h: InternalRoHeader): Array<{ type: string; value: number | null }> {

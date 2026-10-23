@@ -14,16 +14,25 @@ import { useReportsCtx } from "./shell";
 type Summary = {
   totals: {
     roCount: number; closedCount: number; openCount: number; cpRoCount: number;
-    laborSale: number; laborGross: number; partsSale: number; partsGross: number;
+    laborSale: number; laborCost: number; laborGross: number; partsSale: number; partsCost: number; partsGross: number;
     totalSale: number; totalGross: number; billHours: number; elr: number; hoursPerRo: number; salePerRo: number;
     menuRos: number; menuPenetration: number;
     cp: { laborSale: number; partsSale: number; billHours: number };
     warranty: { laborSale: number; partsSale: number; billHours: number };
     internal: { laborSale: number; partsSale: number; billHours: number };
     other: { laborSale: number; partsSale: number; billHours: number };
+    byPayType: PayTypeGross[];
   };
   series: Array<{ date: string; roCount: number; laborSale: number; partsSale: number; laborGross: number; partsGross: number; billHours: number; menuRos: number }>;
   lastSyncAt: string | null;
+};
+
+type PayTypeGross = {
+  payClass: "CP" | "W" | "I" | "O"; label: string; lines: number;
+  laborSale: number; laborCost: number; laborGross: number;
+  partsSale: number; partsCost: number; partsGross: number;
+  totalSale: number; totalCost: number; totalGross: number;
+  billHours: number; elr: number;
 };
 
 export default function OverviewPage() {
@@ -45,6 +54,8 @@ export default function OverviewPage() {
 
   const spark = (k: keyof Summary["series"][number]) => ({ data: data.series.map((d) => ({ value: Number(d[k]) })) });
   const basisWord = f.basis === "opened" ? "opened" : "closed";
+  const pt = (pc: PayTypeGross["payClass"]) => t.byPayType.find((p) => p.payClass === pc)?.totalGross ?? 0;
+  const cpGross = pt("CP"), wGross = pt("W"), iGross = pt("I");
 
   return (
     <div className="space-y-5">
@@ -61,7 +72,7 @@ export default function OverviewPage() {
         <Stat label="Parts sale" value={fmtMoney(t.partsSale)} subtext={`gross ${fmtMoney(t.partsGross)}`} />
         <Stat label="Billed hours" value={fmtNum(t.billHours, 1)} subtext={`${fmtNum(t.hoursPerRo, 2)} hrs / RO`} spark={spark("billHours")} />
         <Stat label="Effective labor rate" value={fmtMoney(t.elr, 2)} subtext="labor sale ÷ billed hours" />
-        <Stat label="RO gross" value={fmtMoney(t.totalGross)} subtext="labor + parts (sale − cost) on RO lines" tone="success" />
+        <Stat label="RO gross — all pay types" value={fmtMoney(t.totalGross)} subtext={`CP ${fmtMoney(cpGross)} · W ${fmtMoney(wGross)} · I ${fmtMoney(iGross)}`} tone="success" />
         <Stat label="Menu penetration" value={fmtPct(t.menuPenetration)} subtext={`${fmtNum(t.menuRos)} ROs with a factory menu`} spark={spark("menuRos")} />
       </div>
 
@@ -94,34 +105,55 @@ export default function OverviewPage() {
         </Card>
       </div>
 
-      {/* Pay type table */}
+      {/* Pay type table — sale / cost / gross, labor and parts */}
       <Card padded={false}>
-        <div className="p-4 pb-0"><CardHeader><CardTitle>Pay type breakdown</CardTitle><CardDescription>{rangeDays} day{rangeDays === 1 ? "" : "s"} in range</CardDescription></CardHeader></div>
+        <div className="p-4 pb-0"><CardHeader><CardTitle>Pay type breakdown — sale, cost, gross</CardTitle><CardDescription>{rangeDays} day{rangeDays === 1 ? "" : "s"} in range · {f.basis === "closed" ? "CLOSED ROs by Tekion close date" : "ROs by open date, any status"} · every pay type sums to the store total</CardDescription></CardHeader></div>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-[11px] uppercase tracking-wider text-fg-subtle">
-            <tr className="border-b border-line"><th className="px-4 py-2">Pay type</th><th className="px-4 py-2 text-right">Labor sale</th><th className="px-4 py-2 text-right">Parts sale</th><th className="px-4 py-2 text-right">Total</th><th className="px-4 py-2 text-right">Billed hrs</th><th className="px-4 py-2 text-right">ELR</th></tr>
+            <tr className="border-b border-line">
+              <th className="px-4 py-2">Pay type</th>
+              <th className="px-3 py-2 text-right">Labor sale</th><th className="px-3 py-2 text-right">Labor cost</th><th className="px-3 py-2 text-right">Labor gross</th>
+              <th className="px-3 py-2 text-right">Parts sale</th><th className="px-3 py-2 text-right">Parts cost</th><th className="px-3 py-2 text-right">Parts gross</th>
+              <th className="px-3 py-2 text-right">Total sale</th><th className="px-3 py-2 text-right font-semibold">Total gross</th>
+              <th className="px-3 py-2 text-right">Billed hrs</th><th className="px-3 py-2 text-right">ELR</th>
+            </tr>
           </thead>
           <tbody>
-            {([["Customer Pay", t.cp], ["Warranty", t.warranty], ["Internal", t.internal], ["Other / Service Plans", t.other]] as const).map(([name, v]) => (
-              <tr key={name} className="border-b border-line/60">
-                <td className="px-4 py-2 font-medium">{name}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{fmtMoney(v.laborSale)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{fmtMoney(v.partsSale)}</td>
-                <td className="px-4 py-2 text-right tabular-nums font-medium">{fmtMoney(v.laborSale + v.partsSale)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{fmtNum(v.billHours, 1)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{v.billHours ? fmtMoney(v.laborSale / v.billHours, 2) : "—"}</td>
+            {t.byPayType.map((v) => (
+              <tr key={v.payClass} className="border-b border-line/60">
+                <td className="px-4 py-2 font-medium">{v.label}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(v.laborSale)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-fg-muted">{fmtMoney(v.laborCost)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(v.laborGross)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(v.partsSale)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-fg-muted">{fmtMoney(v.partsCost)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(v.partsGross)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(v.totalSale)}</td>
+                <td className="px-3 py-2 text-right tabular-nums font-semibold">{fmtMoney(v.totalGross)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtNum(v.billHours, 1)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{v.billHours ? fmtMoney(v.elr, 2) : "—"}</td>
               </tr>
             ))}
-            <tr className="font-semibold">
-              <td className="px-4 py-2">Total</td>
-              <td className="px-4 py-2 text-right tabular-nums">{fmtMoney(t.laborSale)}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{fmtMoney(t.partsSale)}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{fmtMoney(t.totalSale)}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{fmtNum(t.billHours, 1)}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{fmtMoney(t.elr, 2)}</td>
+            <tr className="font-semibold bg-surface-2/40">
+              <td className="px-4 py-2">Total — all pay types</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(t.laborSale)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-fg-muted">{fmtMoney(t.laborCost)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(t.laborGross)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(t.partsSale)}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-fg-muted">{fmtMoney(t.partsCost)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(t.partsGross)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(t.totalSale)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(t.totalGross)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtNum(t.billHours, 1)}</td>
+              <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(t.elr, 2)}</td>
             </tr>
           </tbody>
         </table>
+        </div>
+        <p className="px-4 py-3 text-[11px] text-fg-subtle">
+          Gross = sale − cost on repair-order lines, from Tekion RO data. "Customer Pay" alone is what the old Advisor Performance Google sheet called "Parts &amp; Labor Gross". Tekion's own Advisor Performance report counts INVOICED (not-yet-closed) ROs and lags a day; this view counts only CLOSED ROs by close date, so it reads lower on open days and matches at month-end.
+        </p>
       </Card>
 
       <div className="flex flex-wrap gap-3 text-sm">

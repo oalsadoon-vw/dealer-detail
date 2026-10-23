@@ -9,10 +9,14 @@ import { reportHref } from "@/lib/client/report-filters";
 import { storeBrand } from "@/lib/client/store-brand";
 import { useReportsCtx } from "../shell";
 
+const pg = (r: { byPayType?: Array<{ payClass: string; totalGross: number }> }, pc: string) =>
+  r.byPayType?.find((p) => p.payClass === pc)?.totalGross ?? 0;
+
 type Row = {
   storeId: string; name: string; abbreviation: string | null; apiSyncEnabled: boolean; lastSyncAt: string | null;
   roCount: number; closedCount: number; cpRoCount: number; laborSale: number; laborGross: number; partsSale: number; partsGross: number;
   totalSale: number; totalGross: number; billHours: number; elr: number; hoursPerRo: number; salePerRo: number; menuRos: number; menuPenetration: number;
+  byPayType: Array<{ payClass: "CP" | "W" | "I" | "O"; totalGross: number }>;
 };
 type Resp = { rows: Row[] };
 type FinDept = { sales: number; cost: number; gross: number; grossPct: number; roCount: number };
@@ -65,7 +69,10 @@ export default function FleetPage() {
     { key: "partsSale", header: "Parts", cell: (r) => fmtMoney(r.partsSale), sortable: true, sortValue: (r) => r.partsSale, align: "right", hideOnMobile: true },
     { key: "totalSale", header: "Total sale", cell: (r) => <span className="font-medium">{fmtMoney(r.totalSale)}</span>, sortable: true, sortValue: (r) => r.totalSale, align: "right" },
     { key: "salePerRo", header: "Sale/RO", cell: (r) => fmtMoney(r.salePerRo), sortable: true, sortValue: (r) => r.salePerRo, align: "right", hideOnMobile: true },
-    { key: "totalGross", header: "RO gross", cell: (r) => fmtMoney(r.totalGross), sortable: true, sortValue: (r) => r.totalGross, align: "right", hideOnMobile: true },
+    { key: "cpGross", header: "CP gross", cell: (r) => fmtMoney(pg(r, "CP")), sortable: true, sortValue: (r) => pg(r, "CP"), align: "right", hideOnMobile: true },
+    { key: "wGross", header: "Warr gross", cell: (r) => fmtMoney(pg(r, "W")), sortable: true, sortValue: (r) => pg(r, "W"), align: "right", hideOnMobile: true },
+    { key: "iGross", header: "Int gross", cell: (r) => fmtMoney(pg(r, "I")), sortable: true, sortValue: (r) => pg(r, "I"), align: "right", hideOnMobile: true },
+    { key: "totalGross", header: "Total gross", cell: (r) => <span className="font-medium">{fmtMoney(r.totalGross)}</span>, sortable: true, sortValue: (r) => r.totalGross, align: "right" },
     { key: "menuPenetration", header: "Menu %", cell: (r) => <span title={`${r.menuRos} menu ROs`}>{fmtPct(r.menuPenetration, 0)}</span>, sortable: true, sortValue: (r) => r.menuPenetration, align: "right" },
   ];
 

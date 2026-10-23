@@ -69,6 +69,87 @@ function opDateWhere(range: ReportRange) {
 const dateCol = (b: DateBasis): "openDate" | "closeDate" => (b === "opened" ? "openDate" : "closeDate");
 
 // ---------------------------------------------------------------------------
+// Pay-type breakdown (sale, cost, gross — labor and parts) off RoOpFact.
+//
+// RoFact only carries per-pay-type SALE (cpLaborSale …); COST lives per
+// operation, so gross-by-pay-type has to be summed off RoOpFact.payClass.
+// This is the view that reconciles the site to the old "Parts & Labor Gross"
+// Google sheet (which was Customer-Pay gross only) and to Tekion's
+// paySplitTotalsV3 (cp/wp/ip amounts). Verified 2026-10-23 Oct 1–22 fleet:
+// site total gross ties to Tekion within 0.2% every store (TOL/VWC exact).
+// ---------------------------------------------------------------------------
+
+export type PayClass = "CP" | "W" | "I" | "O";
+export const PAY_CLASS_LABEL: Record<PayClass, string> = {
+  CP: "Customer Pay", W: "Warranty", I: "Internal", O: "Other / Service Plans",
+};
+
+export interface PayTypeGross {
+  payClass: PayClass;
+  label: string;
+  lines: number;
+  laborSale: number; laborCost: number; laborGross: number;
+  partsSale: number; partsCost: number; partsGross: number;
+  totalSale: number; totalCost: number; totalGross: number;
+  billHours: number;
+  elr: number;
+}
+
+function emptyPayType(pc: PayClass): PayTypeGross {
+  return {
+    payClass: pc, label: PAY_CLASS_LABEL[pc], lines: 0,
+    laborSale: 0, laborCost: 0, laborGross: 0,
+    partsSale: 0, partsCost: 0, partsGross: 0,
+    totalSale: 0, totalCost: 0, totalGross: 0,
+    billHours: 0, elr: 0,
+  };
+}
+
+function payTypeFromAgg(pc: PayClass, count: number, s: any): PayTypeGross {
+  const ls = s?.laborSale ?? 0, lc = s?.laborCost ?? 0, ps = s?.partsSale ?? 0, pcst = s?.partsCost ?? 0, hrs = s?.billHours ?? 0;
+  return {
+    payClass: pc, label: PAY_CLASS_LABEL[pc], lines: count,
+    laborSale: r2(ls), laborCost: r2(lc), laborGross: r2(ls - lc),
+    partsSale: r2(ps), partsCost: r2(pcst), partsGross: r2(ps - pcst),
+    totalSale: r2(ls + ps), totalCost: r2(lc + pcst), totalGross: r2(ls - lc + ps - pcst),
+    billHours: r2(hrs), elr: div(ls, hrs),
+  };
+}
+
+const PAY_ORDER: PayClass[] = ["CP", "W", "I", "O"];
+
+/** Store-level pay-type breakdown for the range. Always returns all 4 classes (zeros if absent). */
+async function getPayTypeBreakdown(range: ReportRange): Promise<PayTypeGross[]> {
+  const where = { storeId: range.storeId, ...opDateWhere(range) };
+  const g = await prisma.roOpFact.groupBy({
+    by: ["payClass"], where, _count: true,
+    _sum: { laborSale: true, laborCost: true, partsSale: true, partsCost: true, billHours: true },
+  });
+  const m = new Map(g.map((r) => [r.payClass as PayClass, r]));
+  return PAY_ORDER.map((pc) => {
+    const r = m.get(pc);
+    return r ? payTypeFromAgg(pc, r._count, r._sum) : emptyPayType(pc);
+  });
+}
+
+/** Per-advisor pay-type breakdown: advisorId → { CP, W, I, O }. */
+async function getPayTypeBreakdownByAdvisor(range: ReportRange): Promise<Map<string, Record<PayClass, PayTypeGross>>> {
+  const where = { storeId: range.storeId, ...opDateWhere(range) };
+  const g = await prisma.roOpFact.groupBy({
+    by: ["advisorId", "payClass"], where, _count: true,
+    _sum: { laborSale: true, laborCost: true, partsSale: true, partsCost: true, billHours: true },
+  });
+  const out = new Map<string, Record<PayClass, PayTypeGross>>();
+  for (const r of g) {
+    const id = r.advisorId ?? "";
+    if (!out.has(id)) out.set(id, { CP: emptyPayType("CP"), W: emptyPayType("W"), I: emptyPayType("I"), O: emptyPayType("O") });
+    const pc = (PAY_ORDER.includes(r.payClass as PayClass) ? r.payClass : "O") as PayClass;
+    out.get(id)![pc] = payTypeFromAgg(pc, r._count, r._sum);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Summary + daily series
 // ---------------------------------------------------------------------------
 
@@ -95,6 +176,8 @@ export interface SummaryTotals {
   warranty: { laborSale: number; partsSale: number; billHours: number };
   internal: { laborSale: number; partsSale: number; billHours: number };
   other: { laborSale: number; partsSale: number; billHours: number };
+  /** Sale / cost / gross by pay type (labor + parts), off RO operations. Sums to the store totals. */
+  byPayType: PayTypeGross[];
 }
 
 export interface DailyPoint {
@@ -108,7 +191,7 @@ export interface DailyPoint {
   menuRos: number;
 }
 
-function totalsFromAgg(a: any, counts: { ro: number; closed: number; cp: number; menu: number }): SummaryTotals {
+function totalsFromAgg(a: any, counts: { ro: number; closed: number; cp: number; menu: number }, byPayType: PayTypeGross[]): SummaryTotals {
   const s = a._sum ?? {};
   const laborSale = s.laborSale ?? 0, laborCost = s.laborCost ?? 0;
   const partsSale = s.partsSale ?? 0, partsCost = s.partsCost ?? 0;
@@ -132,6 +215,7 @@ function totalsFromAgg(a: any, counts: { ro: number; closed: number; cp: number;
     warranty: { laborSale: r2(s.wLaborSale ?? 0), partsSale: r2(s.wPartsSale ?? 0), billHours: r2(s.wBillHours ?? 0) },
     internal: { laborSale: r2(s.iLaborSale ?? 0), partsSale: r2(s.iPartsSale ?? 0), billHours: r2(s.iBillHours ?? 0) },
     other: { laborSale: r2(s.oLaborSale ?? 0), partsSale: r2(s.oPartsSale ?? 0), billHours: r2(s.oBillHours ?? 0) },
+    byPayType,
   };
 }
 
@@ -146,7 +230,7 @@ const SUM_FIELDS = {
 export async function getSummary(tc: TenantContext, range: ReportRange) {
   requireStoreAccess(tc, range.storeId);
   const where = { storeId: range.storeId, ...dateWhere(range) };
-  const [agg, closed, cp, menu, daily] = await Promise.all([
+  const [agg, closed, cp, menu, daily, byPayType] = await Promise.all([
     prisma.roFact.aggregate({ where, _count: true, _sum: SUM_FIELDS }),
     prisma.roFact.count({ where: { ...where, isClosed: true } }),
     prisma.roFact.count({ where: { ...where, isCpRo: true } }),
@@ -158,6 +242,7 @@ export async function getSummary(tc: TenantContext, range: ReportRange) {
       _sum: { laborSale: true, laborCost: true, partsSale: true, partsCost: true, billHours: true },
       orderBy: { [dateCol(range.basis)]: "asc" },
     } as any),
+    getPayTypeBreakdown(range),
   ]);
   const menuDaily = await prisma.roFact.groupBy({
     by: [dateCol(range.basis)],
@@ -188,7 +273,7 @@ export async function getSummary(tc: TenantContext, range: ReportRange) {
   });
   return {
     range,
-    totals: totalsFromAgg(agg, { ro: agg._count, closed, cp, menu }),
+    totals: totalsFromAgg(agg, { ro: agg._count, closed, cp, menu }, byPayType),
     series,
     lastSyncAt: lastSync?.finishedAt?.toISOString() ?? null,
   };
@@ -220,12 +305,20 @@ export interface AdvisorRow {
   cpLaborSale: number;
   wLaborSale: number;
   iLaborSale: number;
+  /** Gross (sale − cost, labor + parts) by pay type. cp+w+i+o == totalGross. */
+  cpGross: number;
+  wGross: number;
+  iGross: number;
+  oGross: number;
+  cpLaborGross: number;
+  cpPartsGross: number;
+  byPayType: Record<PayClass, PayTypeGross>;
 }
 
 export async function getAdvisorPerformance(tc: TenantContext, range: ReportRange) {
   requireStoreAccess(tc, range.storeId);
   const where = { storeId: range.storeId, ...dateWhere(range) };
-  const [agg, closed, cp, menu, advisors] = await Promise.all([
+  const [agg, closed, cp, menu, advisors, payByAdv] = await Promise.all([
     prisma.roFact.groupBy({ by: ["advisorId"], where, _count: true, _sum: SUM_FIELDS }),
     prisma.roFact.groupBy({ by: ["advisorId"], where: { ...where, isClosed: true }, _count: true }),
     prisma.roFact.groupBy({ by: ["advisorId"], where: { ...where, isCpRo: true }, _count: true }),
@@ -234,6 +327,7 @@ export async function getAdvisorPerformance(tc: TenantContext, range: ReportRang
       where: { storeId: range.storeId },
       select: { id: true, nameRaw: true, nameNormalized: true, persona: true },
     }),
+    getPayTypeBreakdownByAdvisor(range),
   ]);
   const byId = (rows: any[]) => new Map(rows.map((r) => [r.advisorId ?? "", r._count as number]));
   const closedM = byId(closed), cpM = byId(cp), menuM = byId(menu);
@@ -247,6 +341,7 @@ export async function getAdvisorPerformance(tc: TenantContext, range: ReportRang
     const hrs = s.billHours ?? 0;
     const n = g._count;
     const m = menuM.get(g.advisorId ?? "") ?? 0;
+    const pt = payByAdv.get(g.advisorId ?? "") ?? { CP: emptyPayType("CP"), W: emptyPayType("W"), I: emptyPayType("I"), O: emptyPayType("O") };
     return {
       advisorId: g.advisorId ?? "",
       name: a?.nameRaw ?? a?.nameNormalized ?? "Unassigned",
@@ -267,6 +362,13 @@ export async function getAdvisorPerformance(tc: TenantContext, range: ReportRang
       cpLaborSale: r2(s.cpLaborSale ?? 0),
       wLaborSale: r2(s.wLaborSale ?? 0),
       iLaborSale: r2(s.iLaborSale ?? 0),
+      cpGross: pt.CP.totalGross,
+      wGross: pt.W.totalGross,
+      iGross: pt.I.totalGross,
+      oGross: pt.O.totalGross,
+      cpLaborGross: pt.CP.laborGross,
+      cpPartsGross: pt.CP.partsGross,
+      byPayType: pt,
     };
   });
   rows.sort((x, y) => y.totalSale - x.totalSale);
@@ -559,8 +661,9 @@ export async function getFleetRollup(tc: TenantContext, p: { startDate: string; 
   });
   const rows = await Promise.all(
     stores.map(async (s) => {
-      const where = { storeId: s.id, ...dateWhere({ storeId: s.id, startDate: p.startDate, endDate: p.endDate, basis: p.basis }) };
-      const [agg, closed, cp, menu, lastSync] = await Promise.all([
+      const range: ReportRange = { storeId: s.id, startDate: p.startDate, endDate: p.endDate, basis: p.basis };
+      const where = { storeId: s.id, ...dateWhere(range) };
+      const [agg, closed, cp, menu, lastSync, byPayType] = await Promise.all([
         prisma.roFact.aggregate({ where, _count: true, _sum: SUM_FIELDS }),
         prisma.roFact.count({ where: { ...where, isClosed: true } }),
         prisma.roFact.count({ where: { ...where, isCpRo: true } }),
@@ -569,11 +672,12 @@ export async function getFleetRollup(tc: TenantContext, p: { startDate: string; 
           where: { storeId: s.id, status: { in: ["COMPLETED", "COMPLETED_WITH_WARNINGS"] } },
           orderBy: { finishedAt: "desc" }, select: { finishedAt: true },
         }),
+        getPayTypeBreakdown(range),
       ]);
       return {
         storeId: s.id, name: s.name, abbreviation: s.abbreviation, apiSyncEnabled: s.apiSyncEnabled,
         lastSyncAt: lastSync?.finishedAt?.toISOString() ?? null,
-        ...totalsFromAgg(agg, { ro: agg._count, closed, cp, menu }),
+        ...totalsFromAgg(agg, { ro: agg._count, closed, cp, menu }, byPayType),
       };
     }),
   );
