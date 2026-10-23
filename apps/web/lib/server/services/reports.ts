@@ -40,12 +40,31 @@ function div(a: number, b: number): number {
   return b ? r2(a / b) : 0;
 }
 
+/**
+ * Shared RO filter for every report.
+ *   opened basis → every RO opened in range, any status (Tekion RO list by created date)
+ *   closed basis → status = CLOSED only, by closeDate. Tekion's closed reports,
+ *                  the scorecards and the financial statement all window on
+ *                  closedTime, which only exists once an RO is CLOSED (posted).
+ *                  INVOICED-not-yet-CLOSED and VOIDED ROs carry a closeDate in
+ *                  RoFact (invoicedTime / modifiedTime fallback) but are NOT
+ *                  closed — counting them overstated SCT Oct 1–21 labor by
+ *                  $139K / parts by $94K (468 INVOICED ROs). Fixed 2026-10-23.
+ */
 function dateWhere(range: ReportRange) {
   const gte = ymdToUtc(range.startDate);
   const lte = ymdToUtc(range.endDate);
   return range.basis === "opened"
     ? { openDate: { gte, lte } }
-    : { closeDate: { gte, lte } };
+    : { closeDate: { gte, lte }, status: "CLOSED" };
+}
+/** Same filter expressed through the RoOpFact → RoFact relation. */
+function opDateWhere(range: ReportRange) {
+  const gte = ymdToUtc(range.startDate);
+  const lte = ymdToUtc(range.endDate);
+  return range.basis === "opened"
+    ? { openDate: { gte, lte } }
+    : { closeDate: { gte, lte }, roFact: { status: "CLOSED" } };
 }
 const dateCol = (b: DateBasis): "openDate" | "closeDate" => (b === "opened" ? "openDate" : "closeDate");
 
@@ -289,18 +308,9 @@ export async function getMenuSales(tc: TenantContext, range: ReportRange) {
   // Closed basis = status CLOSED only. The scorecard windows on Tekion
   // closedTime; an INVOICED-not-yet-CLOSED RO has no closedTime, so it is not
   // in the scorecard until it actually closes (BC 10/21: 7 of 21 site-only ROs).
-  const closedOnly = range.basis !== "opened";
-  const where = {
-    storeId: range.storeId,
-    ...dateWhere(range),
-    ...(closedOnly ? { status: "CLOSED" } : {}),
-  };
+  const where = { storeId: range.storeId, ...dateWhere(range) };
   // RoOpFact carries no status column — apply the same RO filter via relation.
-  const opWhere = {
-    storeId: range.storeId,
-    ...dateWhere(range),
-    ...(closedOnly ? { roFact: { status: "CLOSED" } } : {}),
-  };
+  const opWhere = { storeId: range.storeId, ...opDateWhere(range) };
   const [allByAdv, menuByAdv, lines, byOpcode, advisors, daily] = await Promise.all([
     prisma.roFact.groupBy({ by: ["advisorId"], where, _count: true }),
     prisma.roFact.groupBy({
@@ -402,7 +412,7 @@ export interface OpcodeExplorerParams extends ReportRange {
 
 export async function getOpcodeExplorer(tc: TenantContext, p: OpcodeExplorerParams) {
   requireStoreAccess(tc, p.storeId);
-  const where: any = { storeId: p.storeId, ...dateWhere(p) };
+  const where: any = { storeId: p.storeId, ...opDateWhere(p) };
   if (p.opcodes?.length) where.opcode = { in: p.opcodes.map((o) => o.trim().toUpperCase()) };
   if (p.category) where.category = p.category;
   if (p.commodityKey) where.commodityKey = p.commodityKey;
@@ -453,7 +463,7 @@ export async function getOpcodeExplorer(tc: TenantContext, p: OpcodeExplorerPara
 /** RO-level drill-down for an opcode filter / advisor (detail pages, CSV export). */
 export async function getOpcodeLines(tc: TenantContext, p: OpcodeExplorerParams & { advisorId?: string; limit?: number }) {
   requireStoreAccess(tc, p.storeId);
-  const where: any = { storeId: p.storeId, ...dateWhere(p) };
+  const where: any = { storeId: p.storeId, ...opDateWhere(p) };
   if (p.opcodes?.length) where.opcode = { in: p.opcodes.map((o) => o.trim().toUpperCase()) };
   if (p.category) where.category = p.category;
   if (p.advisorId) where.advisorId = p.advisorId;
