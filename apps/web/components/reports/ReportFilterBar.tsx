@@ -23,6 +23,7 @@ export function ReportFilterBar({ stores, f, lastSyncAt }: { stores: StoreOpt[];
     { label: "Last Month", fn: () => { const r = prevMonthRange(today); return { s: r.start, e: r.end }; } },
     { label: "7D", fn: () => ({ s: addDays(today, -6), e: today }) },
     { label: "30D", fn: () => ({ s: addDays(today, -29), e: today }) },
+    { label: "YTD", fn: () => ({ s: `${today.slice(0, 4)}-01-01`, e: today }) },
   ];
   return (
     <Card padded={false}>

@@ -23,6 +23,7 @@ const PAGES = [
   { href: "/reports/opcodes", label: "Opcodes & Commodities" },
   { href: "/reports/ros", label: "RO List" },
   { href: "/reports/financials", label: "Financials" },
+  { href: "/reports/elr", label: "ELR" },
   { href: "/reports/fleet", label: "Fleet Rollup" },
 ];
 

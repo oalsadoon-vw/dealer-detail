@@ -12,6 +12,7 @@ import {
   getSummary,
 } from "@/lib/server/services/reports";
 import { getFinancials, getFinancialsFleet } from "@/lib/server/services/financials";
+import { getElr, getElrFleet } from "@/lib/server/services/elr";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,8 @@ const Schemas = {
   fleet: Base,
   financials: StoreBase,
   "financials-fleet": Base,
+  elr: StoreBase,
+  "elr-fleet": Base,
 } as const;
 
 type ReportKind = keyof typeof Schemas;
@@ -81,6 +84,8 @@ export const GET = withAuth<{ params: { report: string } }>(async (req, ctx, tc)
       case "fleet":    data = await getFleetRollup(tc, q); break;
       case "financials": data = await getFinancials(tc, q); break;
       case "financials-fleet": data = await getFinancialsFleet(tc, q); break;
+      case "elr":       data = await getElr(tc, q); break;
+      case "elr-fleet": data = await getElrFleet(tc, q); break;
     }
     return NextResponse.json(data, { headers: { "Cache-Control": "private, max-age=60" } });
   } catch (e) {
