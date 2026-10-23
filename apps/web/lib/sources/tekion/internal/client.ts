@@ -195,6 +195,15 @@ export class TekionInternalClient {
     return { total: Number(d.total ?? 0), list: Array.isArray(d.list) ? d.list : [] };
   }
 
+  /** `total` for an arbitrary ro-search body (reconcile / coverage checks). */
+  async countRoSearch(dealerId: string, body: Record<string, unknown>): Promise<number> {
+    const path = "/api/service-module/u/ro/v1/ro-search";
+    const js = `${headerJs(dealerId)}
+(async()=>{ var r = await __call('POST', ${JSON.stringify(path)}, ${JSON.stringify(body)}); return JSON.stringify(r); })()`;
+    const d = unwrap<{ total?: number }>(await this.bridge.eval(js), path);
+    return Number(d.total ?? 0);
+  }
+
   /** Every job (with operations + partLineV2s) for up to 50 roIds, in ONE call. */
   async jobsForRos(dealerId: string, roIds: string[]): Promise<InternalJob[]> {
     if (roIds.length === 0) return [];

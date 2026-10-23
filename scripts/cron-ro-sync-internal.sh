@@ -22,7 +22,8 @@ export TEKION_BROWSER="${TEKION_BROWSER:-http://127.0.0.1:9225}"
 export SYNC_SOURCE=internal
 # Internal path has no quota; cooldown is just politeness toward the browser.
 export SYNC_COOLDOWN_SECONDS="${SYNC_COOLDOWN_SECONDS:-20}"
-unset SYNC_WINDOW_DAYS COLLECT_ST_WINDOW_DAYS || true
+export SYNC_WINDOW_DAYS="${SYNC_WINDOW_DAYS:-7}"
+unset COLLECT_ST_WINDOW_DAYS || true
 
 cd "$APP_DIR"
 set -a; [ -f ./.env ] && . ./.env; set +a
