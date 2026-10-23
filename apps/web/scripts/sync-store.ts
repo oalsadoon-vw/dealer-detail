@@ -171,6 +171,20 @@ export async function syncStore(abbrev: string, windowDays: number): Promise<{
   const facts = await buildRoFacts({ storeId: store.id, fetchedSince: new Date(now.getTime() - 1000) });
   console.log(`${abbrev} facts: ros=${facts.rosBuilt} ops=${facts.opsBuilt} unclassified=${facts.unclassifiedOpcodes.length}`);
 
+  // Orphan sweep: a run that FAILED mid-way (DB reset, ES cap, browser death)
+  // wrote raws but never reached buildRoFacts; later runs skip those ROs as
+  // "unchanged" so they'd stay fact-less (or fact-stale) forever — SCVW 10/22:
+  // 62 raws / 34 closed ROs missing from MTD. Rebuild any raw whose fact is
+  // missing or older than the raw, store-wide.
+  const stale = await prisma.$queryRaw<Array<{ documentId: string }>>`
+    select r."documentId" from "RawRepairOrder" r
+    left join "RoFact" f on f."storeId" = r."storeId" and f."documentId" = r."documentId"
+    where r."storeId" = ${store.id} and (f.id is null or r."fetchedAt" > f."builtAt")`;
+  if (stale.length > 0) {
+    const swept = await buildRoFacts({ storeId: store.id, documentIds: stale.map((s) => s.documentId) });
+    console.log(`${abbrev} facts orphan-sweep: ${stale.length} stale raws → ros=${swept.rosBuilt} ops=${swept.opsBuilt}`);
+  }
+
   return {
     abbrev,
     rosFetched: collectResult?.rosFetched ?? 0,

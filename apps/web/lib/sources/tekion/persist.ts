@@ -108,6 +108,19 @@ export interface RoWriterOptions {
   resolveAdvisor: (tekionUserId: string) => Promise<ResolvedAdvisor>;
 }
 
+/**
+ * A stored snapshot is "hollow" when it has ≥1 job but NO job carries an
+ * operation — i.e. job/search answered with job shells only (seen SCT 10/08,
+ * 39 ROs). Such a row builds a RoFact with laborSale=0/partsSale=0 and would
+ * otherwise be skipped forever by the modifiedTime check.
+ */
+export function isHollowPayload(payload: unknown): boolean {
+  const p = payload as { jobs?: Array<{ operations?: unknown[] }> } | null;
+  const jobs = Array.isArray(p?.jobs) ? p!.jobs! : [];
+  if (jobs.length === 0) return false;
+  return jobs.every((j) => !Array.isArray(j?.operations) || j.operations.length === 0);
+}
+
 export class RoWriter {
   private readonly advisorResolvePromises = new Map<string, Promise<ResolvedAdvisor>>();
   private readonly advisorUpsertPromises = new Map<string, Promise<string>>();
@@ -163,14 +176,20 @@ export class RoWriter {
     return { name, persona };
   }
 
-  /** Header-first skip test: true if our stored copy already has this modifiedTime. */
-  async isUnchangedByHeader(documentId: string, srcModified: Date | null): Promise<{ skip: boolean; businessDate: Date | null }> {
+  /** Header-first skip test: true if our stored copy already has this modifiedTime
+   *  AND is not hollow (a hollow copy = header has live jobs but every stored job
+   *  has zero operations — a transient Tekion job/search miss; SCT 10/08 lost
+   *  $4,980 labor across 39 ROs that way). Hollow copies are always re-fanned-out. */
+  async isUnchangedByHeader(documentId: string, srcModified: Date | null, headerLiveJobs?: number | null): Promise<{ skip: boolean; businessDate: Date | null }> {
     if (!srcModified) return { skip: false, businessDate: null };
     const prior = await withDbRetry("isUnchangedByHeader", () => prisma.rawRepairOrder.findUnique({
       where: { storeId_documentId: { storeId: this.opts.storeId, documentId } },
-      select: { sourceModifiedAt: true, businessDate: true },
+      select: { sourceModifiedAt: true, businessDate: true, payload: true },
     }));
     if (prior?.sourceModifiedAt && prior.sourceModifiedAt.getTime() === srcModified.getTime()) {
+      if ((headerLiveJobs ?? 0) > 0 && isHollowPayload(prior.payload)) {
+        return { skip: false, businessDate: prior.businessDate };
+      }
       return { skip: true, businessDate: prior.businessDate };
     }
     return { skip: false, businessDate: prior?.businessDate ?? null };

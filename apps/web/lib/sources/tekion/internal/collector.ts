@@ -6,7 +6,7 @@ import type { CollectResult, CollectWarning, SyncRunKind, SyncRunStatus } from "
 import { RoWriter, epochToDate, withDbRetry } from "../persist";
 import { BrowserBridge, BrowserNotAuthenticated } from "./browser";
 import { JOB_SEARCH_RO_BATCH, RO_SEARCH_PAGE_MAX, TekionInternalClient } from "./client";
-import type { InternalRoHeader } from "./client";
+import type { InternalJob, InternalRoHeader } from "./client";
 import { groupJobsByRo, mapInternalRo } from "./mapper";
 
 /**
@@ -62,6 +62,13 @@ const CHUNK_MIN_SPAN_MS = 60 * 60 * 1000; // never bisect below 1h (ES will cap 
 export function numericDealerId(id: string): string {
   const m = /_(\d+)_\d+$/.exec(id);
   return m ? m[1]! : id;
+}
+
+/** job/search hits for one RO that are all shells (no operations) → hollow. */
+export function jobsAreHollow(jobs: InternalJob[]): boolean {
+  const live = jobs.filter((j) => j && j.deleted !== true);
+  if (live.length === 0) return true;
+  return live.every((j) => !Array.isArray(j.operations) || j.operations.length === 0);
 }
 
 /**
@@ -182,9 +189,25 @@ export async function collectRepairOrdersInternal(params: CollectInternalParams)
 
   async function processBatch(headers: InternalRoHeader[]): Promise<void> {
     if (headers.length === 0) return;
-    const hits = await client.jobsForRos(dealerId, headers.map((h) => h.id));
+    let hits = await client.jobsForRos(dealerId, headers.map((h) => h.id));
     counters.apiCallCount += 1;
-    const byRo = groupJobsByRo(hits);
+    let byRo = groupJobsByRo(hits);
+    // Hollow guard: header says live jobs, job/search returned job shells with
+    // no operations (transient Tekion miss — SCT 10/08, 39 ROs at $0). Retry
+    // the whole batch once before accepting it.
+    const hollowIds = headers.filter((h) => (h.nonVoidedJobCount ?? h.jobCount ?? 0) > 0 && jobsAreHollow(byRo.get(h.id) ?? [])).map((h) => h.id);
+    if (hollowIds.length > 0) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const retry = await client.jobsForRos(dealerId, hollowIds);
+      counters.apiCallCount += 1;
+      const retryBy = groupJobsByRo(retry);
+      for (const id of hollowIds) { const j = retryBy.get(id); if (j && !jobsAreHollow(j)) byRo.set(id, j); }
+      const still = hollowIds.filter((id) => jobsAreHollow(byRo.get(id) ?? []));
+      if (still.length > 0) {
+        for (const id of still) counters.warnings.push({ documentId: id, message: `job/search returned jobs with zero operations twice — snapshot hollow, will re-fan-out next run` });
+      }
+    }
+    void hits;
     for (const h of headers) {
       try {
         const snapshot = mapInternalRo(h, byRo.get(h.id) ?? []);
@@ -263,7 +286,7 @@ export async function collectRepairOrdersInternal(params: CollectInternalParams)
           seenIds.add(h.id);
           counters.rosFetched += 1;
           const srcModified = epochToDate(Number(h.modifiedTime) || null);
-          const { skip, businessDate } = await writer.isUnchangedByHeader(h.id, srcModified);
+          const { skip, businessDate } = await writer.isUnchangedByHeader(h.id, srcModified, h.nonVoidedJobCount ?? h.jobCount ?? null);
           if (skip) {
             counters.unchanged += 1;
             counters.skippedFanOut += 1;
