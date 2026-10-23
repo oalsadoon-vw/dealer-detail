@@ -28,7 +28,7 @@ import { buildRoFacts } from "../lib/facts/buildRoFacts";
 import { TekionRateLimitError } from "../lib/sources/tekion/client";
 
 const STALE_RUN_MINUTES = 30;
-const DEFAULT_WINDOW_DAYS = 7;
+const DEFAULT_WINDOW_DAYS = 14;
 
 export type SyncSource = "internal" | "openapi";
 export function resolveSyncSource(): SyncSource {

@@ -17,9 +17,10 @@
 import { prisma } from "../lib/db";
 import { syncStore } from "./sync-store";
 
-// 7d (was 3d, Omar 10/23): long repairs close days after last touch, and one
+// 14d (was 3d, Omar 10/23): window is on modifiedTime so long repairs are re-captured
+// at close regardless; width = how many consecutive missed nights we tolerate. One
 // bad night must never leave a permanent hole. Internal path = ~2x calls, trivial.
-const DEFAULT_WINDOW_DAYS = 7;
+const DEFAULT_WINDOW_DAYS = 14;
 const DEFAULT_COOLDOWN_SECONDS = 240;
 
 function sleep(ms: number) {
