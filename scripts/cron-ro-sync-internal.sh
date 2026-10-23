@@ -29,6 +29,9 @@ set -a; [ -f ./.env ] && . ./.env; set +a
 
 echo "===== $(date -Is) all-stores nightly sync [internal] START ====="
 
+# ---- AUTO RE-AUTH (best effort; added 2026-10-23) ----
+bash /home/itadmin/dealer-detail/scripts/ensure-tekion-browser-auth.sh "$TEKION_BROWSER" || true
+
 # ---- AUTH GATE (same check gl-snapshot uses; hostname equality, no regex) ----
 auth=$(curl -sf -m 10 -X POST "$TEKION_BROWSER/eval" -H 'Content-Type: application/json' \
   -d '{"js":"(()=>String(!!localStorage.t_token && document.cookie.indexOf(\"tcookie=\")>=0 && location.hostname===\"app.tekioncloud.com\"))()"}' 2>/dev/null || true)

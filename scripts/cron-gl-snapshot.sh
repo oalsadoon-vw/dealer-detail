@@ -25,6 +25,9 @@ set -a
 set +a
 
 echo "===== $(date -Is) GL snapshot START ====="
+# Best-effort auto re-auth of :9225 (login.py OTP flow) before the hard check below. Added 2026-10-23
+# after three consecutive 05:30 SKIPs because the browser logged itself out overnight.
+bash /home/itadmin/dealer-detail/scripts/ensure-tekion-browser-auth.sh "$GL_BROWSER" || true
 # Browser must be logged in; if not, say so loudly and exit non-zero so the
 # gap shows in the log (Jay re-auths :9225 via restore_9223_session-style flow).
 if ! curl -sf -m 10 -X POST "$GL_BROWSER/eval" -H 'Content-Type: application/json' \
