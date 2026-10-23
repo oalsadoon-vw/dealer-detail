@@ -6,6 +6,30 @@ import type { ResolvedAdvisor } from "./advisors";
 import type { RepairOrder, RepairOrderSnapshot } from "./types";
 
 /**
+ * Long syncs (hours) hit transient Postgres drops ("Connection reset by peer",
+ * Prisma P1001/P1002/P1008/P1017, "connection pool timeout"). Prisma reconnects
+ * on the next query, so a short backoff + retry is all that is needed — without
+ * it one dropped packet fails a 40k-RO backfill at row 7,439.
+ */
+const TRANSIENT_DB_RE = /ECONNRESET|Connection reset|P1001|P1002|P1008|P1017|connection pool|Server has closed the connection|terminating connection|Timed out fetching a new connection/i;
+export async function withDbRetry<T>(label: string, fn: () => Promise<T>, attempts = 5): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const msg = `${(err as Error)?.message ?? ""} ${(err as { code?: string })?.code ?? ""}`;
+      if (!TRANSIENT_DB_RE.test(msg) || i === attempts - 1) throw err;
+      const delay = 1000 * 2 ** i;
+      console.warn(`[persist] transient DB error on ${label} (attempt ${i + 1}/${attempts}) — retry in ${delay}ms: ${msg.trim().slice(0, 160)}`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
+/**
  * Shared RawRepairOrder writer — used by BOTH collectors (OpenAPI and
  * internal) so the persistence rules (content hash, derived columns,
  * businessDate moves, advisor upsert) live in exactly one place and the two
@@ -120,8 +144,8 @@ export class RoWriter {
     let p = this.advisorUpsertPromises.get(key);
     if (!p) {
       const storeId = this.opts.storeId;
-      p = prisma.advisor
-        .upsert({
+      p = withDbRetry("advisor.upsert", () =>
+        prisma.advisor.upsert({
           where: { storeId_nameNormalized: { storeId, nameNormalized } },
           create: { storeId, nameNormalized, nameRaw, tekionUserId: advisorTekionId, persona },
           update: {
@@ -129,8 +153,10 @@ export class RoWriter {
             ...(nameRaw ? { nameRaw } : {}),
             ...(persona ? { persona } : {}),
           },
-        })
-        .then((a) => a.id);
+        }),
+      ).then((a) => a.id);
+      // a failed upsert must not poison the cache for the next RO with this advisor
+      p.catch(() => this.advisorUpsertPromises.delete(key));
       this.advisorUpsertPromises.set(key, p);
     }
     await p;
@@ -140,10 +166,10 @@ export class RoWriter {
   /** Header-first skip test: true if our stored copy already has this modifiedTime. */
   async isUnchangedByHeader(documentId: string, srcModified: Date | null): Promise<{ skip: boolean; businessDate: Date | null }> {
     if (!srcModified) return { skip: false, businessDate: null };
-    const prior = await prisma.rawRepairOrder.findUnique({
+    const prior = await withDbRetry("isUnchangedByHeader", () => prisma.rawRepairOrder.findUnique({
       where: { storeId_documentId: { storeId: this.opts.storeId, documentId } },
       select: { sourceModifiedAt: true, businessDate: true },
-    });
+    }));
     if (prior?.sourceModifiedAt && prior.sourceModifiedAt.getTime() === srcModified.getTime()) {
       return { skip: true, businessDate: prior.businessDate };
     }
@@ -164,10 +190,10 @@ export class RoWriter {
     const payload = snapshot as unknown as Record<string, unknown>;
     const contentHash = sha256Hex(stableJsonStringify(payload));
 
-    const existing = await prisma.rawRepairOrder.findUnique({
+    const existing = await withDbRetry("write.findUnique", () => prisma.rawRepairOrder.findUnique({
       where: { storeId_documentId: { storeId, documentId } },
       select: { id: true, contentHash: true, closeDate: true, businessDate: true },
-    });
+    }));
     const now = new Date();
     const movedFrom =
       existing && existing.businessDate.getTime() !== businessDate.getTime() ? existing.businessDate : null;
@@ -188,21 +214,21 @@ export class RoWriter {
     };
 
     if (!existing) {
-      await prisma.rawRepairOrder.create({ data: { storeId, documentId, ...common } });
+      await withDbRetry("write.create", () => prisma.rawRepairOrder.create({ data: { storeId, documentId, ...common } }));
       return { outcome: "created", businessDate, movedFromBusinessDate: null };
     }
     if (existing.contentHash !== contentHash) {
-      await prisma.rawRepairOrder.update({ where: { id: existing.id }, data: common });
+      await withDbRetry("write.update", () => prisma.rawRepairOrder.update({ where: { id: existing.id }, data: common }));
       return { outcome: "updated", businessDate, movedFromBusinessDate: movedFrom };
     }
     if ((closeDate && !existing.closeDate) || movedFrom) {
-      await prisma.rawRepairOrder.update({
+      await withDbRetry("write.repair", () => prisma.rawRepairOrder.update({
         where: { id: existing.id },
         data: { status: ro.status ?? null, closeDate, businessDate, sourceModifiedAt: srcModified, fetchedAt: now },
-      });
+      }));
       return { outcome: "repaired", businessDate, movedFromBusinessDate: movedFrom };
     }
-    await prisma.rawRepairOrder.update({ where: { id: existing.id }, data: { sourceModifiedAt: srcModified } });
+    await withDbRetry("write.touch", () => prisma.rawRepairOrder.update({ where: { id: existing.id }, data: { sourceModifiedAt: srcModified } }));
     return { outcome: "unchanged", businessDate, movedFromBusinessDate: null };
   }
 }

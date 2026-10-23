@@ -11,11 +11,12 @@ export SYNC_SOURCE=internal
 cd "$APP_DIR"
 set -a; [ -f ./.env ] && . ./.env; set +a
 exec > >(tee -a "$LOG") 2>&1
-echo "===== $(date -Is) backfill-2026 START (window 300d, internal) ====="
+echo "===== $(date -Is) backfill-2026 START (window ${WINDOW_DAYS:-300}d, stores: ${*:-ALL}, internal) ====="
 bash /home/itadmin/dealer-detail/scripts/ensure-tekion-browser-auth.sh "$TEKION_BROWSER" || true
-for s in VWC SCVW ARSJ BC TOL BST SCT; do
+STORES="${*:-VWC SCVW ARSJ BC TOL BST SCT}"
+for s in $STORES; do
   echo "----- $(date -Is) $s -----"
-  timeout -k 30 7200 npm run -s sync:store -- "$s" 300
+  timeout -k 30 10800 npm run -s sync:store -- "$s" "${WINDOW_DAYS:-300}"
   echo "----- $(date -Is) $s rc=$? -----"
   sleep 20
 done

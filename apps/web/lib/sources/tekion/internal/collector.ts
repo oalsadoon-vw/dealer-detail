@@ -3,7 +3,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { reapStaleRuns } from "../reaper";
 import type { CollectResult, CollectWarning, SyncRunKind, SyncRunStatus } from "../collector";
-import { RoWriter, epochToDate } from "../persist";
+import { RoWriter, epochToDate, withDbRetry } from "../persist";
 import { BrowserBridge, BrowserNotAuthenticated } from "./browser";
 import { JOB_SEARCH_RO_BATCH, RO_SEARCH_PAGE_MAX, TekionInternalClient } from "./client";
 import type { InternalRoHeader } from "./client";
@@ -48,6 +48,15 @@ export interface CollectInternalParams {
 }
 
 export const RESUME_BACKOFF_MS = 60_000;
+/**
+ * Tekion's ro-search is Elasticsearch-backed: `start + size` cannot exceed
+ * 10,000 (the ES result-window cap) — page 51 returns 500 "unexpected.error".
+ * Any window whose total exceeds this is bisected (by modifiedTime) into
+ * sub-windows that each fit, scanned in ASC order so cursor/resume still holds.
+ */
+export const RO_SEARCH_RESULT_WINDOW_MAX = 10_000;
+const CHUNK_TARGET = 9_000; // headroom: rows can shift between the count probe and the scan
+const CHUNK_MIN_SPAN_MS = 60 * 60 * 1000; // never bisect below 1h (ES will cap that anyway)
 
 /** "americanmotorscorporation_1251_0" → "1251"; "1251" → "1251". */
 export function numericDealerId(id: string): string {
@@ -134,7 +143,7 @@ export async function collectRepairOrdersInternal(params: CollectInternalParams)
       : opts.fatalError
         ? [{ message: opts.fatalError.message, name: opts.fatalError.name, stack: opts.fatalError.stack ?? null }]
         : undefined;
-    await prisma.syncRun.update({
+    await withDbRetry("syncRun.finalize", () => prisma.syncRun.update({
       where: { id: syncRun.id },
       data: {
         status,
@@ -157,7 +166,7 @@ export async function collectRepairOrdersInternal(params: CollectInternalParams)
         } as unknown as never,
         finishedAt: new Date(),
       },
-    });
+    }));
   }
 
   const handlers: Partial<Record<NodeJS.Signals, () => void>> = {};
@@ -219,15 +228,33 @@ export async function collectRepairOrdersInternal(params: CollectInternalParams)
 
       const startMs = effectiveStart.getTime();
       const endMs = windowEnd.getTime() - 1; // inclusive bound → emulate exclusive upper
-      let start = 0;
-      let total = Infinity;
       let pending: InternalRoHeader[] = [];
       const seenIds = new Set<string>();
 
-      while (start < total) {
-        const page = await client.searchRoHeaders(dealerId, startMs, endMs, start, pageSize);
+      // Split [startMs,endMs] into chunks whose totals fit under the ES cap.
+      async function countIn(a: number, b: number): Promise<number> {
+        const probe = await client.searchRoHeaders(dealerId, a, b, 0, 1);
         counters.apiCallCount += 1;
-        total = page.total;
+        return probe.total;
+      }
+      async function chunk(a: number, b: number): Promise<Array<[number, number]>> {
+        const n = await countIn(a, b);
+        if (n <= CHUNK_TARGET || b - a <= CHUNK_MIN_SPAN_MS) return [[a, b]];
+        const mid = Math.floor((a + b) / 2);
+        return [...(await chunk(a, mid)), ...(await chunk(mid + 1, b))];
+      }
+      const chunks = await chunk(startMs, endMs);
+      if (chunks.length > 1) {
+        console.log(`[collector:internal] window split into ${chunks.length} sub-windows (ES ${RO_SEARCH_RESULT_WINDOW_MAX}-row cap)`);
+      }
+
+      for (const [cStart, cEnd] of chunks) {
+      let start = 0;
+      let total = Infinity;
+      while (start < total) {
+        const page = await client.searchRoHeaders(dealerId, cStart, cEnd, start, pageSize);
+        counters.apiCallCount += 1;
+        total = Math.min(page.total, RO_SEARCH_RESULT_WINDOW_MAX);
         if (page.list.length === 0) break;
         start += page.list.length;
 
@@ -255,6 +282,7 @@ export async function collectRepairOrdersInternal(params: CollectInternalParams)
           const maxMod = Math.max(...page.list.map((h) => Number(h.modifiedTime) || 0));
           if (maxMod > (lastCursor ?? 0)) lastCursor = maxMod;
         }
+      }
       }
       await processBatch(pending);
       params.onProgress?.({ seen: counters.rosFetched, total: counters.rosFetched, written: counters.created + counters.updated, skipped: counters.skippedFanOut });

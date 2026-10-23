@@ -195,6 +195,15 @@ export class TekionInternalClient {
     return { total: Number(d.total ?? 0), list: Array.isArray(d.list) ? d.list : [] };
   }
 
+  /** Full page for an arbitrary ro-search body (reconcile / tie-out probes). */
+  async rawRoSearch(dealerId: string, body: Record<string, unknown>): Promise<{ total: number; list: InternalRoHeader[] }> {
+    const path = "/api/service-module/u/ro/v1/ro-search";
+    const js = `${headerJs(dealerId)}
+(async()=>{ var r = await __call('POST', ${JSON.stringify(path)}, ${JSON.stringify(body)}); return JSON.stringify(r); })()`;
+    const d = unwrap<{ total?: number; list?: InternalRoHeader[] }>(await this.bridge.eval(js), path);
+    return { total: Number(d.total ?? 0), list: Array.isArray(d.list) ? d.list : [] };
+  }
+
   /** `total` for an arbitrary ro-search body (reconcile / coverage checks). */
   async countRoSearch(dealerId: string, body: Record<string, unknown>): Promise<number> {
     const path = "/api/service-module/u/ro/v1/ro-search";
