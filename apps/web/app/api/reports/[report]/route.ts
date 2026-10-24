@@ -16,6 +16,9 @@ import { getElr, getElrFleet } from "@/lib/server/services/elr";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Vercel default is 10 s — YTD / fleet ranges legitimately take a few seconds
+// on a cold pooler connection; give the function room instead of a 504.
+export const maxDuration = 60;
 
 const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -87,8 +90,16 @@ export const GET = withAuth<{ params: { report: string } }>(async (req, ctx, tc)
       case "elr":       data = await getElr(tc, q); break;
       case "elr-fleet": data = await getElrFleet(tc, q); break;
     }
-    return NextResponse.json(data, { headers: { "Cache-Control": "private, max-age=60" } });
+    // Facts only change on the nightly sync + 06:30 heal, so a 5-minute
+    // browser cache makes page/store switching back to a seen view instant.
+    return NextResponse.json(data, { headers: { "Cache-Control": "private, max-age=300, stale-while-revalidate=600" } });
   } catch (e) {
-    return NextResponse.json({ error: "Report query failed", details: String(e) }, { status: 500 });
+    const msg = String(e);
+    const transient = /connection pool|ECONNRESET|57014|statement timeout|P1001|P1008|P1017|P2024/i.test(msg);
+    console.error(`[reports/${kind}] ${transient ? "TRANSIENT " : ""}query failed: ${msg.slice(0, 400)}`);
+    return NextResponse.json(
+      { error: transient ? "Report query timed out — retrying" : "Report query failed", details: msg.slice(0, 400), transient },
+      { status: transient ? 503 : 500, headers: transient ? { "Retry-After": "2" } : {} },
+    );
   }
 });

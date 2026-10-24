@@ -538,6 +538,9 @@ model RoOpFact {
 
   openDate  DateTime
   closeDate DateTime?
+  /// Denormalized RoFact.status so closed-basis reports filter on this table
+  /// alone (the RoOpFact→RoFact join forced a full RoFact seq scan: 6–7 s/store).
+  roStatus  String?
 
   jobNumber  String?
   jobStatus  String?
@@ -565,7 +568,11 @@ model RoOpFact {
   @@index([storeId, opcode])
   @@index([storeId, category, closeDate])
   @@index([storeId, isMenuSale, closeDate])
+  @@index([storeId, roStatus, closeDate])
+  @@index([storeId, advisorId, roStatus, closeDate])
   @@index([roFactId])
+  // + covering indexes RoOpFact_cover_{closed,opened}_idx (INCLUDE ... — not
+  //   expressible in Prisma schema; see migration 20261024183000).
 }
 
 model OpcodeCategory {

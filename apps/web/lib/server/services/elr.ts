@@ -129,7 +129,7 @@ function payTypeExclusions(toyota: boolean): Prisma.Sql {
 
 function baseWhere(range: ReportRange): Prisma.Sql {
   const col = range.basis === "opened" ? Prisma.sql`o."openDate"` : Prisma.sql`o."closeDate"`;
-  const closedOnly = range.basis !== "opened" ? Prisma.sql`AND f.status = 'CLOSED'` : Prisma.empty;
+  const closedOnly = range.basis !== "opened" ? Prisma.sql`AND o."roStatus" = 'CLOSED'` : Prisma.empty;
   return Prisma.sql`o."storeId" = ${range.storeId}
     AND ${col} >= ${new Date(`${range.startDate}T00:00:00.000Z`)}
     AND ${col} <= ${new Date(`${range.endDate}T00:00:00.000Z`)}
@@ -148,22 +148,25 @@ export async function getElr(tc: TenantContext, range: ReportRange) {
   const where = baseWhere(range);
   const defs = BUCKET_DEFS.filter((d) => !d.toyotaOnly || toyota);
 
-  // One aggregate per bucket — 11 small indexed scans, all in parallel.
-  const buckets: ElrBucket[] = await Promise.all(
-    defs.map(async (d) => {
-      const [a] = await prisma.$queryRaw<Agg[]>(Prisma.sql`
-        SELECT sum(o."laborSale")::float AS ls, sum(o."billHours")::float AS bh, count(DISTINCT o."documentId")::int AS ros
-        FROM "RoOpFact" o JOIN "RoFact" f ON f.id = o."roFactId"
-        WHERE ${where} AND ${bucketSql(d.key, houseMakes, toyota)}`);
-      const ls = a?.ls ?? 0, bh = a?.bh ?? 0;
-      return { key: d.key, label: d.label, group: d.group, laborSale: r2(ls), billHours: r2(bh), ros: a?.ros ?? 0, elr: bh ? r2(ls / bh) : null };
-    }),
-  );
+  // ONE scan of the range with a FILTER aggregate per bucket (was 11 separate
+  // joined scans in parallel — 14 s MTD / 90 s YTD on SCT; now one indexed pass).
+  const bucketCols = defs.map((d) => Prisma.sql`
+    sum(o."laborSale") FILTER (WHERE ${bucketSql(d.key, houseMakes, toyota)})::float AS ${Prisma.raw(`"ls_${d.key}"`)},
+    sum(o."billHours") FILTER (WHERE ${bucketSql(d.key, houseMakes, toyota)})::float AS ${Prisma.raw(`"bh_${d.key}"`)},
+    count(DISTINCT o."documentId") FILTER (WHERE ${bucketSql(d.key, houseMakes, toyota)})::int AS ${Prisma.raw(`"ros_${d.key}"`)}`);
+  const [bAgg] = await prisma.$queryRaw<Array<Record<string, number | null>>>(Prisma.sql`
+    SELECT ${Prisma.join(bucketCols, ", ")}
+    FROM "RoOpFact" o JOIN "RoFact" f ON f.id = o."roFactId"
+    WHERE ${where}`);
+  const buckets: ElrBucket[] = defs.map((d) => {
+    const ls = bAgg?.[`ls_${d.key}`] ?? 0, bh = bAgg?.[`bh_${d.key}`] ?? 0;
+    return { key: d.key, label: d.label, group: d.group, laborSale: r2(ls), billHours: r2(bh), ros: bAgg?.[`ros_${d.key}`] ?? 0, elr: bh ? r2(ls / bh) : null };
+  });
 
   // By advisor: CP / W / I / total in one grouped query.
   const advAgg = await prisma.$queryRaw<Array<{ advisorId: string | null; pc: string; ls: number; bh: number }>>(Prisma.sql`
     SELECT o."advisorId", o."payClass" AS pc, sum(o."laborSale")::float AS ls, sum(o."billHours")::float AS bh
-    FROM "RoOpFact" o JOIN "RoFact" f ON f.id = o."roFactId"
+    FROM "RoOpFact" o
     WHERE ${where} ${payTypeExclusions(toyota)}
     GROUP BY 1, 2`);
   const advisors = await prisma.advisor.findMany({ where: { storeId: range.storeId }, select: { id: true, nameRaw: true, nameNormalized: true } });
@@ -191,17 +194,19 @@ export async function getElr(tc: TenantContext, range: ReportRange) {
   const trendWhere = baseWhere({ ...range, startDate: trendStart.toISOString().slice(0, 10) });
   const col = range.basis === "opened" ? Prisma.sql`o."openDate"` : Prisma.sql`o."closeDate"`;
   const trendKeys: ElrBucketKey[] = toyota ? ["cp", "warranty", "internal", "total", "txm", "toyotaCare", "prepaid", "pdi"] : ["cp", "warranty", "internal", "total", "pdi"];
-  const trend = await Promise.all(
-    trendKeys.map(async (k) => {
-      const rows = await prisma.$queryRaw<Array<{ mo: string; ls: number; bh: number }>>(Prisma.sql`
-        SELECT to_char(${col}, 'YYYY-MM') AS mo, sum(o."laborSale")::float AS ls, sum(o."billHours")::float AS bh
-        FROM "RoOpFact" o JOIN "RoFact" f ON f.id = o."roFactId"
-        WHERE ${trendWhere} AND ${bucketSql(k, houseMakes, toyota)}
-        GROUP BY 1 ORDER BY 1`);
-      return [k, new Map(rows.map((r) => [r.mo, r.bh ? r2(r.ls / r.bh) : null]))] as const;
-    }),
+  // One grouped-by-month scan with a FILTER pair per bucket (was 8 full
+  // 12-month joined scans in parallel).
+  const trendCols = trendKeys.map((k) => Prisma.sql`
+    sum(o."laborSale") FILTER (WHERE ${bucketSql(k, houseMakes, toyota)})::float AS ${Prisma.raw(`"ls_${k}"`)},
+    sum(o."billHours") FILTER (WHERE ${bucketSql(k, houseMakes, toyota)})::float AS ${Prisma.raw(`"bh_${k}"`)}`);
+  const trendRows = await prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`
+    SELECT to_char(${col}, 'YYYY-MM') AS mo, ${Prisma.join(trendCols, ", ")}
+    FROM "RoOpFact" o
+    WHERE ${trendWhere}
+    GROUP BY 1 ORDER BY 1`);
+  const trendM = new Map<ElrBucketKey, Map<string, number | null>>(
+    trendKeys.map((k) => [k, new Map(trendRows.map((r) => [r.mo as string, r[`bh_${k}`] ? r2((r[`ls_${k}`] ?? 0) / r[`bh_${k}`]) : null]))]),
   );
-  const trendM = new Map(trend);
   const months: string[] = [];
   for (let i = 0; i < 12; i++) {
     const d = new Date(Date.UTC(trendStart.getUTCFullYear(), trendStart.getUTCMonth() + i, 1));
@@ -230,15 +235,23 @@ export async function getElrFleet(tc: TenantContext, p: { startDate: string; end
     select: { id: true, name: true, abbreviation: true },
     orderBy: { name: "asc" },
   });
-  const rows = await Promise.all(
-    stores.map(async (s) => {
-      const range: ReportRange = { storeId: s.id, startDate: p.startDate, endDate: p.endDate, basis: p.basis };
-      const where = baseWhere(range);
-      const agg = await prisma.$queryRaw<Array<{ pc: string; ls: number; bh: number }>>(Prisma.sql`
-        SELECT o."payClass" AS pc, sum(o."laborSale")::float AS ls, sum(o."billHours")::float AS bh
-        FROM "RoOpFact" o JOIN "RoFact" f ON f.id = o."roFactId"
-        WHERE ${where} ${payTypeExclusions(isToyotaStore(s.abbreviation))}
-        GROUP BY 1`);
+  // One grouped query for every store (Toyota carve-outs applied in SQL per
+  // store) instead of N joined queries in parallel through the pool.
+  const col = p.basis === "opened" ? Prisma.sql`o."openDate"` : Prisma.sql`o."closeDate"`;
+  const closedOnly = p.basis !== "opened" ? Prisma.sql`AND o."roStatus" = 'CLOSED'` : Prisma.empty;
+  const toyotaIds = stores.filter((s) => isToyotaStore(s.abbreviation)).map((s) => s.id);
+  const toyotaEx = toyotaIds.length
+    ? Prisma.sql`AND NOT (o."storeId" IN (${Prisma.join(toyotaIds)}) AND ((o."payClass" = 'CP' AND o.opcode ~ '^(TAC|TSC)') OR (o."payClass" = 'I' AND o.opcode = 'PDI')))`
+    : Prisma.empty;
+  const all = await prisma.$queryRaw<Array<{ storeId: string; pc: string; ls: number; bh: number }>>(Prisma.sql`
+    SELECT o."storeId", o."payClass" AS pc, sum(o."laborSale")::float AS ls, sum(o."billHours")::float AS bh
+    FROM "RoOpFact" o
+    WHERE o."storeId" IN (${Prisma.join(stores.map((s) => s.id))})
+      AND ${col} >= ${new Date(`${p.startDate}T00:00:00.000Z`)} AND ${col} <= ${new Date(`${p.endDate}T00:00:00.000Z`)}
+      ${closedOnly} ${toyotaEx}
+    GROUP BY 1, 2`);
+  const rows = stores.map((s) => {
+      const agg = all.filter((a) => a.storeId === s.id);
       const pick = (pc: string) => agg.find((a) => a.pc === pc);
       const cp = pick("CP"), w = pick("W"), i = pick("I");
       const tls = (cp?.ls ?? 0) + (w?.ls ?? 0) + (i?.ls ?? 0), tbh = (cp?.bh ?? 0) + (w?.bh ?? 0) + (i?.bh ?? 0);
@@ -246,7 +259,6 @@ export async function getElrFleet(tc: TenantContext, p: { startDate: string; end
         storeId: s.id, name: s.name, abbreviation: s.abbreviation,
         cp: cell(cp?.ls ?? 0, cp?.bh ?? 0), warranty: cell(w?.ls ?? 0, w?.bh ?? 0), internal: cell(i?.ls ?? 0, i?.bh ?? 0), total: cell(tls, tbh),
       };
-    }),
-  );
+  });
   return { range: p, rows };
 }

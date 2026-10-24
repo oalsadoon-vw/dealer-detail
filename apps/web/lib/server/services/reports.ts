@@ -64,7 +64,7 @@ function opDateWhere(range: ReportRange) {
   const lte = ymdToUtc(range.endDate);
   return range.basis === "opened"
     ? { openDate: { gte, lte } }
-    : { closeDate: { gte, lte }, roFact: { status: "CLOSED" } };
+    : { closeDate: { gte, lte }, roStatus: "CLOSED" }; // denormalized RoFact.status (no join)
 }
 const dateCol = (b: DateBasis): "openDate" | "closeDate" => (b === "opened" ? "openDate" : "closeDate");
 
@@ -659,27 +659,45 @@ export async function getFleetRollup(tc: TenantContext, p: { startDate: string; 
     select: { id: true, name: true, abbreviation: true, apiSyncEnabled: true },
     orderBy: { name: "asc" },
   });
-  const rows = await Promise.all(
-    stores.map(async (s) => {
-      const range: ReportRange = { storeId: s.id, startDate: p.startDate, endDate: p.endDate, basis: p.basis };
-      const where = { storeId: s.id, ...dateWhere(range) };
-      const [agg, closed, cp, menu, lastSync, byPayType] = await Promise.all([
-        prisma.roFact.aggregate({ where, _count: true, _sum: SUM_FIELDS }),
-        prisma.roFact.count({ where: { ...where, isClosed: true } }),
-        prisma.roFact.count({ where: { ...where, isCpRo: true } }),
-        prisma.roFact.count({ where: { ...where, hasMenu: true } }),
-        prisma.syncRun.findFirst({
-          where: { storeId: s.id, status: { in: ["COMPLETED", "COMPLETED_WITH_WARNINGS"] } },
-          orderBy: { finishedAt: "desc" }, select: { finishedAt: true },
-        }),
-        getPayTypeBreakdown(range),
-      ]);
-      return {
-        storeId: s.id, name: s.name, abbreviation: s.abbreviation, apiSyncEnabled: s.apiSyncEnabled,
-        lastSyncAt: lastSync?.finishedAt?.toISOString() ?? null,
-        ...totalsFromAgg(agg, { ro: agg._count, closed, cp, menu }, byPayType),
-      };
+  // One grouped-by-store query per metric (6 total) instead of 6 queries × N
+  // stores fired in parallel — 42 concurrent queries through a 10-connection
+  // pgbouncer pool was timing out ("Timed out fetching a new connection").
+  const ids = stores.map((s) => s.id);
+  const anyRange: ReportRange = { storeId: "", startDate: p.startDate, endDate: p.endDate, basis: p.basis };
+  const where = { storeId: { in: ids }, ...dateWhere(anyRange) };
+  const opWhere = { storeId: { in: ids }, ...opDateWhere(anyRange) };
+  const [agg, closed, cp, menu, lastSyncs, payAgg] = await Promise.all([
+    prisma.roFact.groupBy({ by: ["storeId"], where, _count: true, _sum: SUM_FIELDS }),
+    prisma.roFact.groupBy({ by: ["storeId"], where: { ...where, isClosed: true }, _count: true }),
+    prisma.roFact.groupBy({ by: ["storeId"], where: { ...where, isCpRo: true }, _count: true }),
+    prisma.roFact.groupBy({ by: ["storeId"], where: { ...where, hasMenu: true }, _count: true }),
+    prisma.syncRun.findMany({
+      where: { storeId: { in: ids }, status: { in: ["COMPLETED", "COMPLETED_WITH_WARNINGS"] } },
+      orderBy: { finishedAt: "desc" }, distinct: ["storeId"], select: { storeId: true, finishedAt: true },
     }),
-  );
+    prisma.roOpFact.groupBy({
+      by: ["storeId", "payClass"], where: opWhere, _count: true,
+      _sum: { laborSale: true, laborCost: true, partsSale: true, partsCost: true, billHours: true },
+    }),
+  ]);
+  const cnt = (rows: Array<{ storeId: string; _count: number }>) => new Map(rows.map((r) => [r.storeId, r._count]));
+  const aggM = new Map(agg.map((r) => [r.storeId, r]));
+  const closedM = cnt(closed), cpM = cnt(cp), menuM = cnt(menu);
+  const syncM = new Map(lastSyncs.map((r) => [r.storeId, r.finishedAt]));
+  const payM = new Map<string, Map<PayClass, any>>();
+  for (const r of payAgg) {
+    if (!payM.has(r.storeId)) payM.set(r.storeId, new Map());
+    payM.get(r.storeId)!.set(r.payClass as PayClass, r);
+  }
+  const rows = stores.map((s) => {
+    const a = aggM.get(s.id) ?? { _count: 0, _sum: {} };
+    const pm = payM.get(s.id) ?? new Map();
+    const byPayType = PAY_ORDER.map((pc) => { const r = pm.get(pc); return r ? payTypeFromAgg(pc, r._count, r._sum) : emptyPayType(pc); });
+    return {
+      storeId: s.id, name: s.name, abbreviation: s.abbreviation, apiSyncEnabled: s.apiSyncEnabled,
+      lastSyncAt: syncM.get(s.id)?.toISOString() ?? null,
+      ...totalsFromAgg(a, { ro: a._count, closed: closedM.get(s.id) ?? 0, cp: cpM.get(s.id) ?? 0, menu: menuM.get(s.id) ?? 0 }, byPayType),
+    };
+  });
   return { range: p, rows };
 }

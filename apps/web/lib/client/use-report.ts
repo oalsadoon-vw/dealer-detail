@@ -13,11 +13,33 @@ export function useReport<T>(kind: string, query: string, extra?: Record<string,
     : "";
   useEffect(() => {
     let alive = true;
+    const ctrl = new AbortController();
     setState((s) => ({ ...s, loading: true, error: null }));
-    fetchApi<T>(`/api/reports/${kind}?${query}${extraQs}`)
-      .then((d) => alive && setState({ data: d, loading: false, error: null }))
-      .catch((e) => alive && setState({ data: null, loading: false, error: e instanceof Error ? e.message : String(e) }));
-    return () => { alive = false; };
+    const url = `/api/reports/${kind}?${query}${extraQs}`;
+    // Retry transient failures (pool timeout / 503 / 504 / network blip) up to
+    // 3× with backoff before surfacing an error — one cold query shouldn't
+    // leave a manager staring at "Couldn't load".
+    const run = async () => {
+      let lastErr: unknown = null;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        if (!alive) return;
+        try {
+          const d = await fetchApi<T>(url, { signal: ctrl.signal });
+          if (alive) setState({ data: d, loading: false, error: null });
+          return;
+        } catch (e) {
+          lastErr = e;
+          const msg = e instanceof Error ? e.message : String(e);
+          if (ctrl.signal.aborted) return;
+          const retryable = /timed out|retrying|Request failed \((502|503|504|429)\)|Failed to fetch|NetworkError|Load failed/i.test(msg);
+          if (!retryable || attempt === 3) break;
+          await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
+        }
+      }
+      if (alive) setState({ data: null, loading: false, error: lastErr instanceof Error ? lastErr.message : String(lastErr) });
+    };
+    void run();
+    return () => { alive = false; ctrl.abort(); };
   }, [kind, query, extraQs]);
   return state;
 }

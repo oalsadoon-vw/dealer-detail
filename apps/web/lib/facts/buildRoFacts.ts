@@ -420,6 +420,7 @@ export async function buildRoFacts(params: BuildRoFactsParams): Promise<BuildRoF
           advisorId,
           openDate: f.ro.openDate,
           closeDate: f.ro.closeDate,
+          roStatus: f.ro.status,
         })),
       );
       if (opRows.length) await tx.roOpFact.createMany({ data: opRows });
