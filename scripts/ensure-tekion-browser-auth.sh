@@ -10,6 +10,9 @@
 # its own hard login check and exits 2 if we couldn't recover.
 #
 # Usage: . scripts/ensure-tekion-browser-auth.sh [http://127.0.0.1:9225]
+# login.py reads the OTP via `himalaya` (~/.local/bin) — cron's PATH lacks it
+# (10/25 06:30: "count_otp_emails error: No such file or directory: 'himalaya'").
+export PATH="/home/itadmin/.local/bin:/home/itadmin/.cargo/bin:$PATH"
 BROWSER_URL="${1:-${TEKION_BROWSER:-${GL_BROWSER:-http://127.0.0.1:9225}}}"
 PORT="${BROWSER_URL##*:}"
 VPY="/home/itadmin/.hermes/hermes-agent/venv/bin/python3.11"
