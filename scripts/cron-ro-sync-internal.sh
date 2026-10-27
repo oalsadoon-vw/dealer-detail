@@ -34,10 +34,9 @@ echo "===== $(date -Is) all-stores nightly sync [internal] START ====="
 bash /home/itadmin/dealer-detail/scripts/ensure-tekion-browser-auth.sh "$TEKION_BROWSER" || true
 
 # ---- AUTH GATE (same check gl-snapshot uses; hostname equality, no regex) ----
-auth=$(curl -sf -m 10 -X POST "$TEKION_BROWSER/eval" -H 'Content-Type: application/json' \
-  -d '{"js":"(()=>String(!!localStorage.t_token && document.cookie.indexOf(\"tcookie=\")>=0 && location.hostname===\"app.tekioncloud.com\"))()"}' 2>/dev/null || true)
-if ! grep -q '"true"' <<<"$auth"; then
-  echo "===== $(date -Is) SKIPPED: $TEKION_BROWSER not logged into Tekion (got: ${auth:-no response}) — re-auth :9225 ====="
+auth=$(bash /home/itadmin/dealer-detail/scripts/tekion-browser-probe.sh "$TEKION_BROWSER" 2>/dev/null || true)
+if [ "$auth" != "OK" ]; then
+  echo "===== $(date -Is) SKIPPED: $TEKION_BROWSER Tekion session not live (probe: ${auth:-no response}) — re-auth :9225 ====="
   exit 2
 fi
 

@@ -30,9 +30,9 @@ echo "===== $(date -Is) GL snapshot START ====="
 bash /home/itadmin/dealer-detail/scripts/ensure-tekion-browser-auth.sh "$GL_BROWSER" || true
 # Browser must be logged in; if not, say so loudly and exit non-zero so the
 # gap shows in the log (Jay re-auths :9225 via restore_9223_session-style flow).
-if ! curl -sf -m 10 -X POST "$GL_BROWSER/eval" -H 'Content-Type: application/json' \
-     -d '{"js":"(()=>String(!!localStorage.t_token && location.hostname===\"app.tekioncloud.com\"))()"}' | grep -q '"true"'; then
-  echo "===== $(date -Is) GL snapshot SKIPPED: $GL_BROWSER not logged into Tekion ====="
+auth=$(bash /home/itadmin/dealer-detail/scripts/tekion-browser-probe.sh "$GL_BROWSER" 2>/dev/null || true)
+if [ "$auth" != "OK" ]; then
+  echo "===== $(date -Is) GL snapshot SKIPPED: $GL_BROWSER Tekion session not live (probe: ${auth:-no response}) ====="
   exit 2
 fi
 

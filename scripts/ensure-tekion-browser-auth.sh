@@ -18,15 +18,22 @@ PORT="${BROWSER_URL##*:}"
 VPY="/home/itadmin/.hermes/hermes-agent/venv/bin/python3.11"
 RESTORE="/home/itadmin/tekion-reports/restore_9223_session.py"
 
+PROBE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/tekion-browser-probe.sh"
+
+# REAL probe (2026-10-26): a 1-row internal ro-search must return 200. Token
+# presence alone passed on 10/25 while Tekion said "Login user session is
+# expired" — that is the failure mode this now catches.
 _probe() {
-  curl -sf -m 10 -X POST "$BROWSER_URL/eval" -H 'Content-Type: application/json' \
-    -d '{"js":"(()=>String(!!localStorage.t_token && document.cookie.indexOf(\"tcookie=\")>=0 && location.hostname===\"app.tekioncloud.com\"))()"}' 2>/dev/null | grep -q '"true"'
+  local r
+  r=$(bash "$PROBE" "$BROWSER_URL" 2>/dev/null)
+  _PROBE_LAST="$r"
+  [ "$r" = "OK" ]
 }
 
 if _probe; then
-  echo "===== $(date -Is) browser auth OK ($BROWSER_URL) ====="
+  echo "===== $(date -Is) browser auth OK ($BROWSER_URL, live ro-search 200) ====="
 else
-  echo "===== $(date -Is) browser $BROWSER_URL logged out — attempting auto re-auth ====="
+  echo "===== $(date -Is) browser $BROWSER_URL logged out [$_PROBE_LAST] — attempting auto re-auth ====="
   if [ -x "$VPY" ] && [ -f "$RESTORE" ]; then
     HOME=/home/itadmin timeout 420 "$VPY" "$RESTORE" "$PORT" 2>&1 | grep -Ei "LOGGED_IN|REUSED|FAIL|Error|url:|rc=" | tail -6 || true
     if ! _probe; then
