@@ -122,12 +122,19 @@ async function fetchCells(dealer: string, fsId: string, ymd: string): Promise<Re
 }
 
 /** Supabase pooler drops idle connections during long browser fetches — retry once after reconnect. */
-async function withDb<T>(fn: () => Promise<T>): Promise<T> {
-  try { return await fn(); }
-  catch (e: any) {
-    if (!/closed the connection|Connection reset|ECONNRESET|P1017/i.test(String(e))) throw e;
-    await prisma.$disconnect().catch(() => {}); await prisma.$connect();
-    return fn();
+// 2026-10-29: Supabase is slow 05:30–06:40 PT three mornings running — 57014
+// statement timeouts + "Transaction already closed" (default 5s itx timeout).
+// Retry up to 4x with backoff; reconnect on connection-level errors.
+const RETRYABLE = /closed the connection|Connection reset|ECONNRESET|P1017|P1001|P2028|P2024|57014|statement timeout|Transaction already closed|Can't reach database/i;
+async function withDb<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
+  for (let i = 1; ; i++) {
+    try { return await fn(); }
+    catch (e: any) {
+      if (i >= attempts || !RETRYABLE.test(String(e))) throw e;
+      const wait = 15_000 * i;
+      console.warn(`[gl] db retry ${i}/${attempts - 1} in ${wait / 1000}s: ${String(e).split("\n").find((l) => /error|timeout|closed/i.test(l))?.trim().slice(0, 160)}`);
+      await prisma.$disconnect().catch(() => {}); await new Promise((r) => setTimeout(r, wait)); await prisma.$connect();
+    }
   }
 }
 
@@ -180,7 +187,7 @@ async function snapshotStore(abbrev: string, dates: string[], meta: Meta) {
     await withDb(() => prisma.$transaction(async (tx) => {
       await tx.glAccountDaily.deleteMany({ where: { storeId: store.id, asOfDate: new Date(ymd) } });
       for (let i = 0; i < rows.length; i += 500) await tx.glAccountDaily.createMany({ data: rows.slice(i, i + 500) });
-    }));
+    }, { maxWait: 60_000, timeout: 180_000 }));
     const svc = rows.filter((r) => r.department === "SERVICE");
     const sales = -svc.filter((r) => r.accountType === "SALE").reduce((s, r) => s + r.mtd, 0);
     const cost = svc.filter((r) => r.accountType === "COST_OF_SALE").reduce((s, r) => s + r.mtd, 0);
