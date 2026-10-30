@@ -1,13 +1,16 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 
-import { Card, CardHeader, CardTitle, CardDescription, DataTable, Stat, Button, Badge, Skeleton, EmptyState, type Column } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardDescription, DataTable, Stat, Badge, Skeleton, EmptyState, type Column } from "@/components/ui";
 import { BarChart } from "@/components/charts/BarChart";
-import { useReport, fmtMoney, fmtNum, fmtPct, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { useReport, fmtMoney, fmtNum, fmtPct } from "@/lib/client/use-report";
 import { reportHref, roBasisWord, serializeStatuses, serializePayClasses } from "@/lib/client/report-filters";
 import { storeBrand } from "@/lib/client/store-brand";
+import { useRegisterExportTable } from "@/components/reports/ExportProvider";
 import { useReportsCtx } from "../shell";
+import type { ExportColumn } from "@/lib/client/export";
 
 const pg = (r: { byPayType?: Array<{ payClass: string; totalGross: number }> }, pc: string) =>
   r.byPayType?.find((p) => p.payClass === pc)?.totalGross ?? 0;
@@ -22,6 +25,37 @@ type Resp = { rows: Row[] };
 type FinDept = { sales: number; cost: number; gross: number; grossPct: number; roCount: number };
 type FinRow = { storeId: string; name: string; abbreviation: string | null; asOf: string | null; service: FinDept; parts: FinDept };
 type FinResp = { rows: FinRow[] };
+
+const FLEET_STORE_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "name", label: "Store", type: "text" },
+  { key: "roCount", label: "ROs", type: "number" },
+  { key: "cpRoCount", label: "CP ROs", type: "number" },
+  { key: "billHours", label: "Bill hrs", type: "number" },
+  { key: "hoursPerRo", label: "Hrs/RO", type: "number" },
+  { key: "elr", label: "ELR", type: "money" },
+  { key: "laborSale", label: "Labor", type: "money" },
+  { key: "partsSale", label: "Parts", type: "money" },
+  { key: "totalSale", label: "Total sale", type: "money" },
+  { key: "salePerRo", label: "Sale/RO", type: "money" },
+  { key: "cpGross", label: "CP gross", type: "money" },
+  { key: "wGross", label: "Warr gross", type: "money" },
+  { key: "iGross", label: "Int gross", type: "money" },
+  { key: "totalGross", label: "Total gross", type: "money" },
+  { key: "menuPenetration", label: "Menu %", type: "number" },
+];
+const FLEET_FIN_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "store", label: "Store", type: "text" },
+  { key: "asOf", label: "GL as of", type: "date" },
+  { key: "serviceRos", label: "Svc ROs (MTD)", type: "number" },
+  { key: "serviceSales", label: "Service sales", type: "money" },
+  { key: "serviceCost", label: "Service cost", type: "money" },
+  { key: "serviceGross", label: "Service gross", type: "money" },
+  { key: "serviceGp", label: "Service GP %", type: "number" },
+  { key: "partsSales", label: "Parts sales", type: "money" },
+  { key: "partsCost", label: "Parts cost", type: "money" },
+  { key: "partsGross", label: "Parts gross", type: "money" },
+  { key: "partsGp", label: "Parts GP %", type: "number" },
+];
 
 /**
  * "Fleet rollup" = all 7 AMG stores side by side for the same date range, plus
@@ -42,6 +76,26 @@ export default function FleetPage() {
   const rows = (data?.rows ?? []).filter((r) => r.apiSyncEnabled || r.roCount > 0);
   const finRows = (fin.data?.rows ?? []).filter((r) => r.service.sales || r.parts.sales);
   const FT = finRows.reduce((t, r) => ({ ss: t.ss + r.service.sales, sg: t.sg + r.service.gross, ps: t.ps + r.parts.sales, pg: t.pg + r.parts.gross }), { ss: 0, sg: 0, ps: 0, pg: 0 });
+
+  const storeExport = useMemo(() => rows.map((r) => ({
+    name: r.name, roCount: r.roCount, cpRoCount: r.cpRoCount, billHours: r.billHours, hoursPerRo: r.hoursPerRo,
+    elr: r.elr, laborSale: r.laborSale, partsSale: r.partsSale, totalSale: r.totalSale, salePerRo: r.salePerRo,
+    cpGross: pg(r, "CP"), wGross: pg(r, "W"), iGross: pg(r, "I"), totalGross: r.totalGross, menuPenetration: r.menuPenetration,
+  })), [rows]);
+  const finExport = useMemo(() => finRows.map((r) => ({
+    store: r.abbreviation ?? r.name, asOf: r.asOf,
+    serviceRos: r.service.roCount, serviceSales: r.service.sales, serviceCost: r.service.cost, serviceGross: r.service.gross, serviceGp: r.service.grossPct,
+    partsSales: r.parts.sales, partsCost: r.parts.cost, partsGross: r.parts.gross, partsGp: r.parts.grossPct,
+  })), [finRows]);
+
+  useRegisterExportTable(
+    { id: "fleet-store", name: "Store comparison", rows: storeExport, columns: FLEET_STORE_EXPORT_COLUMNS, primary: true },
+    [storeExport]
+  );
+  useRegisterExportTable(
+    { id: "fleet-fin", name: "Financial statement", rows: finExport, columns: FLEET_FIN_EXPORT_COLUMNS },
+    [finExport]
+  );
 
   if (error) return <EmptyState title="Couldn't load fleet rollup" description={error} />;
   if (loading || !data) return <Skeleton className="h-96 w-full" />;
@@ -99,7 +153,6 @@ export default function FleetPage() {
       <Card padded={false}>
         <div className="flex items-center justify-between p-4 pb-2">
           <CardHeader><CardTitle>Store comparison</CardTitle><CardDescription>Same date range and basis across every store</CardDescription></CardHeader>
-          <Button size="sm" variant="subtle" onClick={() => downloadCsv(`fleet-${f.basis}-${f.startDate}_${f.endDate}.csv`, toCsv(rows.map(({ storeId: _s, ...r }) => r)))}>Export CSV</Button>
         </div>
         <DataTable<Row> columns={cols} rows={rows} keyField={(r) => r.storeId} initialSort={{ key: "totalSale", dir: "desc" }} density="compact" />
       </Card>
@@ -110,7 +163,6 @@ export default function FleetPage() {
             <CardTitle>Financial statement — Service &amp; Parts</CardTitle>
             <CardDescription>GL postings for the date range (same source as the printed OEM statement) · fleet service gross {fmtMoney(FT.sg)} on {fmtMoney(FT.ss)} · parts gross {fmtMoney(FT.pg)} on {fmtMoney(FT.ps)}</CardDescription>
           </CardHeader>
-          <Button size="sm" variant="subtle" onClick={() => downloadCsv(`fleet-financials-${f.startDate}_${f.endDate}.csv`, toCsv(finRows.map((r) => ({ store: r.abbreviation ?? r.name, asOf: r.asOf, serviceRos: r.service.roCount, serviceSales: r.service.sales, serviceCost: r.service.cost, serviceGross: r.service.gross, partsSales: r.parts.sales, partsCost: r.parts.cost, partsGross: r.parts.gross }))))}>Export CSV</Button>
         </div>
         {fin.loading ? <Skeleton className="h-40 w-full" /> : fin.error ? <EmptyState title="Couldn't load financials" description={fin.error} /> : finRows.length === 0 ? <EmptyState title="No GL snapshots in this range" /> : (
           <DataTable<FinRow> columns={finCols} rows={finRows} keyField={(r) => r.storeId} initialSort={{ key: "sGross", dir: "desc" }} density="compact" />

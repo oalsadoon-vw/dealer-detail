@@ -1,11 +1,13 @@
 "use client";
 
-import { Card, CardHeader, CardTitle, CardDescription, DataTable, Stat, Button, Skeleton, EmptyState, type Column } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardDescription, DataTable, Button, Stat, Skeleton, EmptyState, type Column } from "@/components/ui";
 import { BarChart } from "@/components/charts/BarChart";
 import { OpenRoCaption } from "@/components/reports/OpenRoCaption";
-import { useReport, fmtMoney, fmtNum, fmtPct, fmtDateShort, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { useReport, fmtMoney, fmtNum, fmtPct, fmtDateShort } from "@/lib/client/use-report";
 import { resetFilters } from "@/lib/client/report-filters";
+import { useRegisterExportTable } from "@/components/reports/ExportProvider";
 import { useReportsCtx } from "../shell";
+import type { ExportColumn } from "@/lib/client/export";
 
 type AdvRow = { advisorId: string; name: string; roCount: number; menuRos: number; menuLines: number; penetration: number; menuLaborSale: number; menuPartsSale: number; menuTotal: number };
 type OpRow = { opcode: string; description: string | null; lines: number; laborSale: number; partsSale: number; total: number };
@@ -26,10 +28,38 @@ function menuLabel(opcode: string): string {
   return `${miles >= 1000 ? `${miles / 1000}K` : miles} ${tier}${sched}`;
 }
 
+const MENU_ADVISOR_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "name", label: "Advisor", type: "text" },
+  { key: "menuRos", label: "Menus sold", type: "number" },
+  { key: "roCount", label: "ROs", type: "number" },
+  { key: "penetration", label: "Penetration", type: "number" },
+  { key: "menuLaborSale", label: "Menu labor", type: "money" },
+  { key: "menuPartsSale", label: "Menu parts", type: "money" },
+  { key: "menuTotal", label: "Menu $", type: "money" },
+];
+
+const MENU_PACKAGE_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "opcode", label: "Opcode", type: "text" },
+  { key: "description", label: "Description", type: "text" },
+  { key: "lines", label: "Sold", type: "number" },
+  { key: "laborSale", label: "Labor", type: "money" },
+  { key: "partsSale", label: "Parts", type: "money" },
+  { key: "total", label: "Total", type: "money" },
+];
+
 export default function MenuSalesPage() {
   const { f, stores } = useReportsCtx();
   const { data, loading, error } = useReport<Resp>("menu", f.query);
   const store = stores.find((s) => s.id === f.storeId);
+
+  useRegisterExportTable(
+    { id: "menu-advisors", name: "By advisor", rows: (data?.rows ?? []) as Record<string, unknown>[], columns: MENU_ADVISOR_EXPORT_COLUMNS, primary: true },
+    [data?.rows]
+  );
+  useRegisterExportTable(
+    { id: "menu-packages", name: "By menu package", rows: (data?.opcodes ?? []) as Record<string, unknown>[], columns: MENU_PACKAGE_EXPORT_COLUMNS },
+    [data?.opcodes]
+  );
 
   if (error) return <EmptyState title="Couldn't load report" description={error} />;
   if (loading || !data) return <Skeleton className="h-96 w-full" />;
@@ -78,10 +108,7 @@ export default function MenuSalesPage() {
       </div>
 
       <Card padded={false}>
-        <div className="flex items-center justify-between p-4 pb-2">
-          <CardHeader><CardTitle>By advisor</CardTitle><CardDescription>Same math as the daily/MTD menu-sales scorecard emails</CardDescription></CardHeader>
-          <Button size="sm" variant="subtle" onClick={() => downloadCsv(`${store?.abbreviation ?? "store"}-menu-sales-${f.basis}-${f.startDate}_${f.endDate}.csv`, toCsv(data.rows.map(({ advisorId: _a, ...r }) => r)))}>Export CSV</Button>
-        </div>
+        <div className="p-4 pb-2"><CardHeader><CardTitle>By advisor</CardTitle><CardDescription>Same math as the daily/MTD menu-sales scorecard emails</CardDescription></CardHeader></div>
         <DataTable<AdvRow> columns={advCols} rows={data.rows} keyField={(r) => r.advisorId || r.name} initialSort={{ key: "menuRos", dir: "desc" }} density="compact" />
       </Card>
 

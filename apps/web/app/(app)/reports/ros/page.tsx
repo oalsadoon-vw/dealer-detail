@@ -4,9 +4,11 @@ import { useState } from "react";
 
 import { Card, CardHeader, CardTitle, CardDescription, DataTable, Button, Tabs, Badge, Skeleton, EmptyState, type Column } from "@/components/ui";
 import { OpenRoCaption } from "@/components/reports/OpenRoCaption";
-import { useReport, fmtMoney, fmtNum, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { useReport, fmtMoney, fmtNum } from "@/lib/client/use-report";
 import { resetFilters } from "@/lib/client/report-filters";
+import { useRegisterExportTable } from "@/components/reports/ExportProvider";
 import { useReportsCtx } from "../shell";
+import type { ExportColumn } from "@/lib/client/export";
 
 type Ro = {
   ro: string; status: string | null; type: string | null; openDate: string; closeDate: string | null; isClosed: boolean;
@@ -19,17 +21,37 @@ const STATUS_TONE: Record<string, "success" | "warning" | "info" | "neutral" | "
   CLOSED: "success", INVOICED: "success", READY_FOR_INVOICE: "info", IN_PROGRESS: "warning", TECH_ASSIGNED: "warning", HOLD: "danger", VOIDED: "neutral",
 };
 
+const RO_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "ro", label: "RO #", type: "text" },
+  { key: "status", label: "Status", type: "text" },
+  { key: "openDate", label: "Opened", type: "date" },
+  { key: "closeDate", label: "Closed", type: "date" },
+  { key: "advisor", label: "Advisor", type: "text" },
+  { key: "vehicle", label: "Vehicle", type: "text" },
+  { key: "type", label: "Type", type: "text" },
+  { key: "billHours", label: "Hrs", type: "number" },
+  { key: "cp", label: "CP", type: "money" },
+  { key: "warranty", label: "Warr", type: "money" },
+  { key: "internal", label: "Int", type: "money" },
+  { key: "totalSale", label: "Total", type: "money" },
+  { key: "hasMenu", label: "Menu", type: "text" },
+];
+
 /**
  * The tie-out page. Every RO in range with BOTH its open and close date, so a
  * manager comparing against Tekion's RO list can see exactly why a count
  * differs (RO opened 9/2 but closed 9/4 → counted on 9/2 in Opened, 9/4 in Closed).
  */
 export default function RoListPage() {
-  const { f, stores } = useReportsCtx();
-  const store = stores.find((s) => s.id === f.storeId);
+  const { f } = useReportsCtx();
   const [status, setStatus] = useState<"all" | "open" | "closed">("all");
   const { data, loading, error } = useReport<Ro[]>("ros", f.query, { status, limit: "5000" });
   const rows = data ?? [];
+
+  useRegisterExportTable(
+    { id: "ros", name: "RO list", rows: rows as Record<string, unknown>[], columns: RO_EXPORT_COLUMNS, primary: true },
+    [rows]
+  );
 
   const cols: Column<Ro>[] = [
     { key: "ro", header: "RO #", cell: (r) => <span className="font-medium tabular-nums">{r.ro}</span>, sortable: true, sortValue: (r) => r.ro, sticky: true },
@@ -61,7 +83,6 @@ export default function RoListPage() {
           </CardHeader>
           <div className="flex items-center gap-2">
             <Tabs tabs={[{ id: "all", label: "All" }, { id: "open", label: "Still open" }, { id: "closed", label: "Closed" }]} value={status} onChange={(v) => setStatus(v as typeof status)} variant="segmented" />
-            <Button size="sm" variant="subtle" disabled={!rows.length} onClick={() => downloadCsv(`${store?.abbreviation ?? "store"}-ros-${f.basis}-${f.startDate}_${f.endDate}.csv`, toCsv(rows))}>Export CSV</Button>
           </div>
         </div>
         {error ? <EmptyState title="Couldn't load" description={error} /> : loading ? <Skeleton className="m-4 h-64" /> : (

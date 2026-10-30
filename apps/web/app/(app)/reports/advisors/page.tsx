@@ -6,9 +6,11 @@ import { Card, CardHeader, CardTitle, CardDescription, DataTable, Button, Skelet
 import { BarChart } from "@/components/charts/BarChart";
 import { OpenRoCaption } from "@/components/reports/OpenRoCaption";
 import { StatusMix } from "@/components/reports/StatusMix";
-import { useReport, fmtMoney, fmtNum, fmtPct, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { useReport, fmtMoney, fmtNum, fmtPct } from "@/lib/client/use-report";
 import { resetFilters } from "@/lib/client/report-filters";
+import { useRegisterExportTable } from "@/components/reports/ExportProvider";
 import { useReportsCtx } from "../shell";
+import type { ExportColumn } from "@/lib/client/export";
 
 type Row = {
   advisorId: string; name: string; persona: string | null;
@@ -23,11 +25,33 @@ type Row = {
 };
 type Resp = { rows: Row[] };
 
+const ADVISOR_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "name", label: "Advisor", type: "text" },
+  { key: "roCount", label: "ROs", type: "number" },
+  { key: "cpRoCount", label: "CP ROs", type: "number" },
+  { key: "billHours", label: "Bill hrs", type: "number" },
+  { key: "hoursPerRo", label: "Hrs/RO", type: "number" },
+  { key: "laborSale", label: "Labor sale", type: "money" },
+  { key: "elr", label: "ELR", type: "money" },
+  { key: "partsSale", label: "Parts sale", type: "money" },
+  { key: "totalSale", label: "Total sale", type: "money" },
+  { key: "salePerRo", label: "Sale/RO", type: "money" },
+  { key: "cpGross", label: "CP gross", type: "money" },
+  { key: "wGross", label: "Warr gross", type: "money" },
+  { key: "iGross", label: "Int gross", type: "money" },
+  { key: "totalGross", label: "Total gross", type: "money" },
+  { key: "menuPenetration", label: "Menu %", type: "number" },
+];
+
 export default function AdvisorsPage() {
-  const { f, stores } = useReportsCtx();
+  const { f } = useReportsCtx();
   const { data, loading, error } = useReport<Resp>("advisors", f.query);
   const rows = data?.rows ?? [];
-  const store = stores.find((s) => s.id === f.storeId);
+
+  useRegisterExportTable(
+    { id: "advisors", name: "Advisor table", rows: rows as Record<string, unknown>[], columns: ADVISOR_EXPORT_COLUMNS, primary: true },
+    [rows]
+  );
 
   const totals = useMemo(() => rows.reduce((t, r) => ({
     roCount: t.roCount + r.roCount, closedCount: t.closedCount + r.closedCount, cpRoCount: t.cpRoCount + r.cpRoCount,
@@ -82,7 +106,6 @@ export default function AdvisorsPage() {
             <CardTitle>Advisor performance</CardTitle>
             <CardDescription>{fmtNum(totals.roCount)} ROs · {fmtNum(totals.billHours, 1)} hrs · {fmtMoney(totals.totalSale)} sale · ELR {totals.billHours ? fmtMoney(totals.laborSale / totals.billHours, 2) : "—"} · menu {totals.roCount ? fmtPct((totals.menuRos / totals.roCount) * 100, 0) : "—"}<br />Gross: CP {fmtMoney(totals.cpGross)} · Warranty {fmtMoney(totals.wGross)} · Internal {fmtMoney(totals.iGross)}{totals.oGross ? ` · Other ${fmtMoney(totals.oGross)}` : ""} · <span className="font-medium">Total {fmtMoney(totals.totalGross)}</span> ({f.basis === "closed" ? "CLOSED ROs by close date" : f.basis === "opened" ? "ROs by open date" : "ROs opened or closed in range"}; gross = sale − cost, labor + parts)</CardDescription>
           </CardHeader>
-          <Button size="sm" variant="subtle" onClick={() => downloadCsv(`${store?.abbreviation ?? "store"}-advisors-${f.basis}-${f.startDate}_${f.endDate}.csv`, toCsv(rows.map(({ advisorId: _a, byPayType: _b, ...r }) => r)))}>Export CSV</Button>
         </div>
         <DataTable<Row> columns={columns} rows={rows} keyField={(r) => r.advisorId || r.name} initialSort={{ key: "totalSale", dir: "desc" }} density="compact" />
       </Card>

@@ -5,9 +5,11 @@ import { useMemo, useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, DataTable, Button, Skeleton, EmptyState, Stat, Badge, type Column } from "@/components/ui";
 import { AreaChart } from "@/components/charts/AreaChart";
 import { BarChart } from "@/components/charts/BarChart";
-import { useReport, fmtMoney, fmtNum, fmtPct, fmtDateShort, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { useReport, fmtMoney, fmtNum, fmtPct, fmtDateShort } from "@/lib/client/use-report";
 import { glQuery } from "@/lib/client/report-filters";
+import { useRegisterExportTable } from "@/components/reports/ExportProvider";
 import { useReportsCtx } from "../shell";
+import type { ExportColumn } from "@/lib/client/export";
 
 type Dept = { sales: number; cost: number; gross: number; grossPct: number; roCount: number; expenses: number };
 type Line = {
@@ -26,16 +28,35 @@ type Resp = {
 
 const DEPT_LABEL: Record<string, string> = { SERVICE: "Service", PARTS: "Parts", BODY_SHOP: "Body Shop" };
 
+const FIN_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "fsLine", label: "FS line", type: "text" },
+  { key: "roCount", label: "ROs (MTD)", type: "number" },
+  { key: "sales", label: "Sales", type: "money" },
+  { key: "cost", label: "Cost", type: "money" },
+  { key: "gross", label: "Gross", type: "money" },
+  { key: "gpPct", label: "GP %", type: "number" },
+  { key: "mtdSales", label: "MTD sales", type: "money" },
+  { key: "mtdGross", label: "MTD gross", type: "money" },
+];
+
 export default function FinancialsPage() {
-  const { f, stores } = useReportsCtx();
+  const { f } = useReportsCtx();
   // Financials are GL postings — basis/status/pay are stripped so the GL
   // query (and cache key) only carries store + range.
   const { data, loading, error } = useReport<Resp>("financials", glQuery(f));
-  const store = stores.find((s) => s.id === f.storeId);
   const [dept, setDept] = useState<"SERVICE" | "PARTS">("SERVICE");
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
   const lines = useMemo(() => (data?.lines ?? []).filter((l) => l.department === dept), [data, dept]);
+  const exportRows = useMemo(() => lines.map((l) => ({
+    fsLine: l.fsLine, roCount: l.mtdCount, sales: l.sales, cost: l.cost, gross: l.gross,
+    gpPct: l.sales ? (l.gross / l.sales) * 100 : null, mtdSales: l.mtdSales, mtdGross: l.mtdGross,
+  })), [lines]);
+
+  useRegisterExportTable(
+    { id: "financials", name: `${DEPT_LABEL[dept]} — financial statement lines`, rows: exportRows, columns: FIN_EXPORT_COLUMNS, primary: true },
+    [exportRows]
+  );
   const sameMonth = data ? data.range.startDate.slice(0, 7) === data.range.endDate.slice(0, 7) : true;
   const isMtdView = data ? sameMonth && data.range.startDate.endsWith("-01") : false;
 
@@ -128,7 +149,6 @@ export default function FinancialsPage() {
             {(["SERVICE", "PARTS"] as const).map((d) => (
               <Button key={d} size="sm" variant={dept === d ? "primary" : "subtle"} onClick={() => setDept(d)}>{DEPT_LABEL[d]}</Button>
             ))}
-            <Button size="sm" variant="subtle" onClick={() => downloadCsv(`${store?.abbreviation ?? "store"}-financials-${dept.toLowerCase()}-${data.range.startDate}_${data.range.endDate}.csv`, toCsv(lines.flatMap((l) => l.accounts.map((a) => ({ department: l.department, fsLine: l.fsLine, account: a.accountNumber, name: a.accountName, type: a.accountType, period: a.period, mtd: a.mtd, mtdCount: a.mtdCount })))))}>Export CSV</Button>
           </div>
         </div>
         <DataTable<Line> columns={columns} rows={lines} keyField={(r) => `${r.department}|${r.fsLine}`} initialSort={{ key: "mtdSales", dir: "desc" }} density="compact" />

@@ -5,15 +5,47 @@ import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, DataTable, Stat, Button, Input, Select, FormField, Skeleton, EmptyState, type Column } from "@/components/ui";
 import { BarChart } from "@/components/charts/BarChart";
 import { OpenRoCaption } from "@/components/reports/OpenRoCaption";
-import { useReport, fmtMoney, fmtNum, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { useReport, fmtMoney, fmtNum } from "@/lib/client/use-report";
 import { resetFilters } from "@/lib/client/report-filters";
+import { useRegisterExportTable } from "@/components/reports/ExportProvider";
 import { useReportsCtx } from "../shell";
+import type { ExportColumn } from "@/lib/client/export";
 
 type Money = { laborSale: number; laborGross: number; partsSale: number; partsGross: number; total: number; billHours: number; partsQty: number };
 type OpRow = { opcode: string; description: string | null; lines: number } & Money;
 type AdvRow = { advisorId: string; name: string; lines: number; ros: number } & Money;
 type Resp = { totalLines: number; totalRos: number; opcodes: OpRow[]; advisors: AdvRow[] };
 type Line = { ro: string; openDate: string; closeDate: string | null; status: string | null; advisor: string; vehicle: string; vin: string | null; mileage: number | null; opcode: string; description: string | null; pay: string; laborSale: number; partsSale: number; total: number; billHours: number; partsQty: number };
+
+const OPCODE_ADV_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "name", label: "Advisor", type: "text" },
+  { key: "lines", label: "Sold (lines)", type: "number" },
+  { key: "ros", label: "ROs", type: "number" },
+  { key: "partsQty", label: "Parts qty", type: "number" },
+  { key: "billHours", label: "Bill hrs", type: "number" },
+  { key: "total", label: "Revenue", type: "money" },
+];
+const OPCODE_OP_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "opcode", label: "Opcode", type: "text" },
+  { key: "description", label: "Description", type: "text" },
+  { key: "lines", label: "Lines", type: "number" },
+  { key: "partsQty", label: "Parts qty", type: "number" },
+  { key: "billHours", label: "Bill hrs", type: "number" },
+  { key: "laborSale", label: "Labor", type: "money" },
+  { key: "partsSale", label: "Parts", type: "money" },
+  { key: "total", label: "Total", type: "money" },
+];
+const OPCODE_LINE_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "ro", label: "RO", type: "text" },
+  { key: "openDate", label: "Opened", type: "date" },
+  { key: "closeDate", label: "Closed", type: "date" },
+  { key: "advisor", label: "Advisor", type: "text" },
+  { key: "vehicle", label: "Vehicle", type: "text" },
+  { key: "opcode", label: "Opcode", type: "text" },
+  { key: "pay", label: "Pay", type: "text" },
+  { key: "partsQty", label: "Qty", type: "number" },
+  { key: "total", label: "Total", type: "money" },
+];
 
 /** Quick-pick presets. Store opcodes differ (SCT ALIGN/OKAL vs TOL 4ALIGN…) so we search by description too. */
 const PRESETS: Array<{ label: string; search?: string; category?: string }> = [
@@ -29,8 +61,7 @@ const PRESETS: Array<{ label: string; search?: string; category?: string }> = [
 ];
 
 export default function OpcodesPage() {
-  const { f, stores } = useReportsCtx();
-  const store = stores.find((s) => s.id === f.storeId);
+  const { f } = useReportsCtx();
   const [search, setSearch] = useState("align");
   const [opcodes, setOpcodes] = useState("");
   const [category, setCategory] = useState("");
@@ -41,6 +72,19 @@ export default function OpcodesPage() {
   const { data, loading, error } = useReport<Resp>("opcodes", f.query, extra);
   const lines = useReport<Line[]>("lines", f.query, { ...extra, advisorId: drillAdvisor ?? undefined, limit: "1000" });
   useEffect(() => { setDrillAdvisor(null); }, [applied, f.query]);
+
+  useRegisterExportTable(
+    { id: "opcodes-advisors", name: "By advisor", rows: (data?.advisors ?? []) as Record<string, unknown>[], columns: OPCODE_ADV_EXPORT_COLUMNS, primary: true },
+    [data?.advisors]
+  );
+  useRegisterExportTable(
+    { id: "opcodes-opcodes", name: "By opcode", rows: (data?.opcodes ?? []) as Record<string, unknown>[], columns: OPCODE_OP_EXPORT_COLUMNS },
+    [data?.opcodes]
+  );
+  useRegisterExportTable(
+    { id: "opcodes-lines", name: "RO detail", rows: (lines.data ?? []) as Record<string, unknown>[], columns: OPCODE_LINE_EXPORT_COLUMNS },
+    [lines.data]
+  );
 
   const apply = () => setApplied({ search: search.trim(), opcodes: opcodes.trim(), category });
 
@@ -117,8 +161,7 @@ export default function OpcodesPage() {
               </Card>
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                 <Card padded={false}>
-                  <div className="flex items-center justify-between p-4 pb-2"><CardHeader><CardTitle>By advisor</CardTitle></CardHeader>
-                    <Button size="sm" variant="subtle" onClick={() => downloadCsv(`${store?.abbreviation}-opcodes-by-advisor-${f.startDate}_${f.endDate}.csv`, toCsv(data.advisors.map(({ advisorId: _a, ...r }) => r)))}>CSV</Button></div>
+                  <div className="p-4 pb-2"><CardHeader><CardTitle>By advisor</CardTitle></CardHeader></div>
                   <DataTable<AdvRow> columns={advCols} rows={data.advisors} keyField={(r) => r.advisorId || r.name} initialSort={{ key: "lines", dir: "desc" }} density="compact" />
                 </Card>
                 <Card padded={false}>
@@ -131,7 +174,6 @@ export default function OpcodesPage() {
                   <CardHeader><CardTitle>RO detail{drillName ? ` — ${drillName}` : ""}</CardTitle><CardDescription>{lines.data ? `${fmtNum(lines.data.length)} lines${lines.data.length >= 1000 ? " (first 1,000)" : ""}` : ""}</CardDescription></CardHeader>
                   <div className="flex gap-2">
                     {drillAdvisor && <Button size="sm" variant="subtle" onClick={() => setDrillAdvisor(null)}>All advisors</Button>}
-                    <Button size="sm" variant="subtle" disabled={!lines.data} onClick={() => lines.data && downloadCsv(`${store?.abbreviation}-opcode-lines-${f.startDate}_${f.endDate}.csv`, toCsv(lines.data))}>CSV</Button>
                   </div>
                 </div>
                 <DataTable<Line> columns={lineCols} rows={lines.data ?? []} loading={lines.loading} keyField={(r, ) => `${r.ro}-${r.opcode}-${r.total}`} initialSort={{ key: "date", dir: "desc" }} density="compact" />
