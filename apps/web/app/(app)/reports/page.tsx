@@ -9,7 +9,9 @@ import { BarChart } from "@/components/charts/BarChart";
 import { PieChart } from "@/components/charts/PieChart";
 import { useReport, fmtMoney, fmtNum, fmtPct, fmtDateShort } from "@/lib/client/use-report";
 import { reportHref } from "@/lib/client/report-filters";
+import { useRegisterExportTable } from "@/components/reports/ExportProvider";
 import { useReportsCtx } from "./shell";
+import type { ExportColumn } from "@/lib/client/export";
 
 type Summary = {
   totals: {
@@ -35,11 +37,45 @@ type PayTypeGross = {
   billHours: number; elr: number;
 };
 
+const PAYTYPE_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "label", label: "Pay type", type: "text" },
+  { key: "laborSale", label: "Labor sale", type: "money" },
+  { key: "laborCost", label: "Labor cost", type: "money" },
+  { key: "laborGross", label: "Labor gross", type: "money" },
+  { key: "partsSale", label: "Parts sale", type: "money" },
+  { key: "partsCost", label: "Parts cost", type: "money" },
+  { key: "partsGross", label: "Parts gross", type: "money" },
+  { key: "totalSale", label: "Total sale", type: "money" },
+  { key: "totalGross", label: "Total gross", type: "money" },
+  { key: "billHours", label: "Billed hrs", type: "number" },
+  { key: "elr", label: "ELR", type: "money" },
+];
+
 export default function OverviewPage() {
   const { f } = useReportsCtx();
   const { data, loading, error } = useReport<Summary>("summary", f.query);
   const t = data?.totals;
   const rangeDays = data?.series.length ?? 0;
+
+  const payTypeRows = useMemo(() => {
+    if (!t) return [] as Record<string, unknown>[];
+    const rows: Record<string, unknown>[] = t.byPayType.map((v) => ({
+      label: v.label, laborSale: v.laborSale, laborCost: v.laborCost, laborGross: v.laborGross,
+      partsSale: v.partsSale, partsCost: v.partsCost, partsGross: v.partsGross,
+      totalSale: v.totalSale, totalGross: v.totalGross, billHours: v.billHours, elr: v.billHours ? v.elr : null,
+    }));
+    rows.push({
+      label: "Total — all pay types", laborSale: t.laborSale, laborCost: t.laborCost, laborGross: t.laborGross,
+      partsSale: t.partsSale, partsCost: t.partsCost, partsGross: t.partsGross,
+      totalSale: t.totalSale, totalGross: t.totalGross, billHours: t.billHours, elr: t.billHours ? t.elr : null,
+    });
+    return rows;
+  }, [t]);
+
+  useRegisterExportTable(
+    { id: "pay-type", name: "Pay type breakdown", rows: payTypeRows, columns: PAYTYPE_EXPORT_COLUMNS, primary: true },
+    [payTypeRows]
+  );
 
   const payMix = useMemo(() => t ? [
     { label: "Customer Pay", value: t.cp.laborSale + t.cp.partsSale, color: "#2563eb" },

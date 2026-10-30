@@ -212,6 +212,93 @@
   }
 }
 
+/* ----------------------------------------------------------------------------
+ * Print / PDF export (Lane C)
+ * ---------------------------------------------------------------------------- */
+
+/* Screen: print-only header + hidden-by-default helpers. */
+.print-only {
+  display: none;
+}
+.print-hide {
+  display: block;
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  /* Force light colors regardless of the active theme, so printed output is
+     always black-on-white (light) with readable contrast. */
+  :root,
+  [data-theme="dark"] {
+    --canvas: 255 255 255;
+    --surface: 255 255 255;
+    --surface-2: 250 250 251;
+    --surface-3: 255 255 255;
+    --border: 228 228 231;
+    --border-subtle: 234 234 238;
+    --border-strong: 180 180 188;
+    --text: 24 24 27;
+    --text-strong: 9 9 11;
+    --text-muted: 82 82 91;
+    --text-subtle: 113 113 122;
+    --accent: 99 102 241;
+    --accent-strong: 79 70 229;
+    --accent-fg: 255 255 255;
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .print-hide {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+
+  /* Cards (and other `rounded-lg` surfaces) shouldn't split mid-way; tall
+     tables still paginate because the browser ignores the hint when a box is
+     taller than the page. */
+  .rounded-lg {
+    break-inside: avoid;
+  }
+
+  /* DataTables: render/flow all rows (no horizontal scroll clipping), repeat
+     the header on each page, and never split a row. */
+  .overflow-x-auto,
+  .overflow-hidden {
+    overflow: visible !important;
+  }
+  table {
+    break-inside: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade-in,
   .fade-in-up,

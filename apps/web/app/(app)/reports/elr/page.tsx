@@ -1,10 +1,12 @@
 "use client";
 
-import { Card, CardHeader, CardTitle, CardDescription, DataTable, Stat, Button, Skeleton, EmptyState, Badge, type Column } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardDescription, DataTable, Stat, Skeleton, EmptyState, Badge, type Column } from "@/components/ui";
 import { BarChart } from "@/components/charts/BarChart";
-import { useReport, fmtMoney, fmtNum, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { useReport, fmtMoney, fmtNum } from "@/lib/client/use-report";
 import { todayPacific, monthStartOf } from "@/lib/client/report-filters";
+import { useRegisterExportTable } from "@/components/reports/ExportProvider";
 import { useReportsCtx } from "../shell";
+import type { ExportColumn } from "@/lib/client/export";
 
 type Cell = { laborSale: number; billHours: number; elr: number | null };
 type Bucket = { key: string; label: string; group: "paytype" | "program" | "other"; laborSale: number; billHours: number; ros: number; elr: number | null };
@@ -20,6 +22,38 @@ type Resp = {
 const fmtRate = (n: number | null | undefined) => (n == null ? "—" : fmtMoney(n, 2));
 const monthLabel = (ym: string) => new Date(`${ym}-01T00:00:00Z`).toLocaleString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" });
 
+const ELR_BUCKET_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "label", label: "Bucket", type: "text" },
+  { key: "elr", label: "ELR", type: "money" },
+  { key: "laborSale", label: "Labor sale", type: "money" },
+  { key: "billHours", label: "Billed hrs", type: "number" },
+  { key: "ros", label: "ROs", type: "number" },
+];
+
+const ELR_ADVISOR_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "name", label: "Advisor", type: "text" },
+  { key: "cpElr", label: "CP ELR", type: "money" },
+  { key: "cpHrs", label: "CP hrs", type: "number" },
+  { key: "wElr", label: "Warranty ELR", type: "money" },
+  { key: "wHrs", label: "Warranty hrs", type: "number" },
+  { key: "iElr", label: "Internal ELR", type: "money" },
+  { key: "iHrs", label: "Internal hrs", type: "number" },
+  { key: "totalElr", label: "Total ELR", type: "money" },
+  { key: "totalHrs", label: "Total hrs", type: "number" },
+];
+
+const ELR_MONTH_EXPORT_COLUMNS: ExportColumn[] = [
+  { key: "month", label: "Month", type: "text" },
+  { key: "cp", label: "Customer Pay", type: "money" },
+  { key: "warranty", label: "Warranty", type: "money" },
+  { key: "internal", label: "Internal", type: "money" },
+  { key: "total", label: "Total", type: "money" },
+  { key: "txm", label: "TXM", type: "money" },
+  { key: "toyotaCare", label: "ToyotaCare", type: "money" },
+  { key: "prepaid", label: "Prepaid", type: "money" },
+  { key: "pdi", label: "PDI", type: "money" },
+];
+
 /**
  * Effective Labor Rate — Joe's WIP "LABOR RATES / ELR" block, live.
  * ELR = labor sale ÷ billed hours. Bucket recipe mirrors the WIP sheet
@@ -31,6 +65,19 @@ export default function ElrPage() {
   const { data, loading, error } = useReport<Resp>("elr", f.query);
   const store = stores.find((s) => s.id === f.storeId);
   const today = todayPacific();
+
+  useRegisterExportTable(
+    { id: "elr-buckets", name: "WIP buckets", rows: (data?.buckets ?? []) as Record<string, unknown>[], columns: ELR_BUCKET_EXPORT_COLUMNS, primary: true },
+    [data?.buckets]
+  );
+  useRegisterExportTable(
+    { id: "elr-advisors", name: "By advisor", rows: (data?.advisors ?? []).map((a) => ({ name: a.name, cpElr: a.cp.elr, cpHrs: a.cp.billHours, wElr: a.warranty.elr, wHrs: a.warranty.billHours, iElr: a.internal.elr, iHrs: a.internal.billHours, totalElr: a.total.elr, totalHrs: a.total.billHours })) as Record<string, unknown>[], columns: ELR_ADVISOR_EXPORT_COLUMNS },
+    [data?.advisors]
+  );
+  useRegisterExportTable(
+    { id: "elr-monthly", name: "Monthly trend", rows: (data?.series ?? []) as Record<string, unknown>[], columns: ELR_MONTH_EXPORT_COLUMNS },
+    [data?.series]
+  );
 
   if (error) return <EmptyState title="Couldn't load report" description={error} />;
   if (loading || !data) return <Skeleton className="h-96 w-full" />;
@@ -81,14 +128,6 @@ export default function ElrPage() {
       : []),
     { key: "pdi", header: "PDI", cell: (r) => fmtRate(r.pdi), align: "right", hideOnMobile: true },
   ];
-
-  const exportAll = () => {
-    const rows = [
-      ...data.buckets.map((x) => ({ section: "bucket", name: x.label, elr: x.elr ?? "", laborSale: x.laborSale, billHours: x.billHours, ros: x.ros })),
-      ...data.advisors.map((a) => ({ section: "advisor", name: a.name, elr: a.total.elr ?? "", laborSale: a.total.laborSale, billHours: a.total.billHours, cpElr: a.cp.elr ?? "", wElr: a.warranty.elr ?? "", iElr: a.internal.elr ?? "" })),
-    ];
-    downloadCsv(`${store?.abbreviation ?? "store"}-elr-${f.basis}-${f.startDate}_${f.endDate}.csv`, toCsv(rows));
-  };
 
   const cpSpark = data.series.map((d) => ({ value: d.cp ?? 0 }));
 
@@ -146,10 +185,7 @@ export default function ElrPage() {
       </div>
 
       <Card padded={false}>
-        <div className="flex items-center justify-between p-4 pb-2">
-          <CardHeader><CardTitle>WIP sheet rows</CardTitle><CardDescription>Same buckets as the LABOR RATES / ELR block on the AMG WIP workbook</CardDescription></CardHeader>
-          <Button size="sm" variant="subtle" onClick={exportAll}>Export CSV</Button>
-        </div>
+        <div className="p-4 pb-2"><CardHeader><CardTitle>WIP sheet rows</CardTitle><CardDescription>Same buckets as the LABOR RATES / ELR block on the AMG WIP workbook</CardDescription></CardHeader></div>
         <DataTable<Bucket> columns={bucketCols} rows={[...data.buckets.filter((x) => x.group === "paytype"), ...programs, ...others]} keyField={(r) => r.key} density="compact" />
       </Card>
 
