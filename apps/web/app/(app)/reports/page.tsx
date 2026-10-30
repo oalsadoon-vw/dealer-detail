@@ -3,12 +3,13 @@
 import { useMemo } from "react";
 import Link from "next/link";
 
-import { Card, CardHeader, CardTitle, CardDescription, Stat, Skeleton, EmptyState, Badge } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardDescription, Stat, Skeleton, EmptyState, Badge, Button } from "@/components/ui";
 import { AreaChart } from "@/components/charts/AreaChart";
 import { BarChart } from "@/components/charts/BarChart";
 import { PieChart } from "@/components/charts/PieChart";
+import { OpenRoCaption } from "@/components/reports/OpenRoCaption";
 import { useReport, fmtMoney, fmtNum, fmtPct, fmtDateShort } from "@/lib/client/use-report";
-import { reportHref } from "@/lib/client/report-filters";
+import { reportHref, resetFilters, roBasisWord } from "@/lib/client/report-filters";
 import { useReportsCtx } from "./shell";
 
 type Summary = {
@@ -50,10 +51,10 @@ export default function OverviewPage() {
 
   if (error) return <EmptyState title="Couldn't load report" description={error} />;
   if (loading || !data || !t) return <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24" />)}</div>;
-  if (t.roCount === 0) return <EmptyState title="No repair orders in this range" description={`No ROs ${f.basis === "opened" ? "opened" : "closed"} between ${fmtDateShort(f.startDate)} and ${fmtDateShort(f.endDate)}. ${data.lastSyncAt ? "" : "This store hasn't synced from Tekion yet."}`} />;
+  if (t.roCount === 0) return <EmptyState title="No repair orders in this range" description={`No ROs ${roBasisWord(f.basis)} between ${fmtDateShort(f.startDate)} and ${fmtDateShort(f.endDate)}. ${data.lastSyncAt ? "" : "This store hasn't synced from Tekion yet."}`} action={<Button variant="primary" size="sm" onClick={() => resetFilters(f)}>Show everything</Button>} />;
 
   const spark = (k: keyof Summary["series"][number]) => ({ data: data.series.map((d) => ({ value: Number(d[k]) })) });
-  const basisWord = f.basis === "opened" ? "opened" : "closed";
+  const basisWord = roBasisWord(f.basis);
   const pt = (pc: PayTypeGross["payClass"]) => t.byPayType.find((p) => p.payClass === pc)?.totalGross ?? 0;
   const cpGross = pt("CP"), wGross = pt("W"), iGross = pt("I");
 
@@ -76,12 +77,14 @@ export default function OverviewPage() {
         <Stat label="Menu penetration" value={fmtPct(t.menuPenetration)} subtext={`${fmtNum(t.menuRos)} ROs with a factory menu`} spark={spark("menuRos")} />
       </div>
 
+      <OpenRoCaption f={f} />
+
       {/* Trends */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>ROs per day</CardTitle>
-            <CardDescription>{f.basis === "opened" ? "Opened (check-in / created date)" : "Closed (close date)"}</CardDescription>
+            <CardDescription>{f.basis === "opened" ? "Opened (check-in / created date)" : f.basis === "closed" ? "Closed (close date)" : "Activity (opened or closed in range)"}</CardDescription>
           </CardHeader>
           <BarChart title="" data={data.series.map((d) => ({ label: fmtDateShort(d.date), value: d.roCount }))} height={220} valueFormatter={(v) => fmtNum(v)} />
         </Card>
@@ -107,7 +110,7 @@ export default function OverviewPage() {
 
       {/* Pay type table — sale / cost / gross, labor and parts */}
       <Card padded={false}>
-        <div className="p-4 pb-0"><CardHeader><CardTitle>Pay type breakdown — sale, cost, gross</CardTitle><CardDescription>{rangeDays} day{rangeDays === 1 ? "" : "s"} in range · {f.basis === "closed" ? "CLOSED ROs by Tekion close date" : "ROs by open date, any status"} · every pay type sums to the store total</CardDescription></CardHeader></div>
+        <div className="p-4 pb-0"><CardHeader><CardTitle>Pay type breakdown — sale, cost, gross</CardTitle><CardDescription>{rangeDays} day{rangeDays === 1 ? "" : "s"} in range · {f.basis === "closed" ? "CLOSED ROs by close date" : f.basis === "opened" ? "ROs by open date, any status" : "ROs opened or closed in range, any status"} · every pay type sums to the store total</CardDescription></CardHeader></div>
         <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-[11px] uppercase tracking-wider text-fg-subtle">

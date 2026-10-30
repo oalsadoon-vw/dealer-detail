@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, DataTable, Stat, Button, Badge, Skeleton, EmptyState, type Column } from "@/components/ui";
 import { BarChart } from "@/components/charts/BarChart";
 import { useReport, fmtMoney, fmtNum, fmtPct, toCsv, downloadCsv } from "@/lib/client/use-report";
-import { reportHref } from "@/lib/client/report-filters";
+import { reportHref, roBasisWord, serializeStatuses, serializePayClasses } from "@/lib/client/report-filters";
 import { storeBrand } from "@/lib/client/store-brand";
 import { useReportsCtx } from "../shell";
 
@@ -29,8 +29,14 @@ type FinResp = { rows: FinRow[] };
  */
 export default function FleetPage() {
   const { f } = useReportsCtx();
-  const q = new URLSearchParams({ startDate: f.startDate, endDate: f.endDate, basis: f.basis }).toString();
-  const { data, loading, error } = useReport<Resp>("fleet", q);
+  // Fleet rollup spans all stores, so it builds its own query (no storeId) but
+  // still threads the RO-scoped filters — basis/status/pay are honored upstream.
+  const q = new URLSearchParams({ startDate: f.startDate, endDate: f.endDate, basis: f.basis });
+  const st = serializeStatuses(f.statuses);
+  if (st) q.set("status", st);
+  const pay = serializePayClasses(f.payClasses);
+  if (pay) q.set("pay", pay);
+  const { data, loading, error } = useReport<Resp>("fleet", q.toString());
   const finQ = new URLSearchParams({ startDate: f.startDate, endDate: f.endDate }).toString();
   const fin = useReport<FinResp>("financials-fleet", finQ);
   const rows = (data?.rows ?? []).filter((r) => r.apiSyncEnabled || r.roCount > 0);
@@ -60,7 +66,7 @@ export default function FleetPage() {
   const cols: Column<Row>[] = [
     { key: "name", header: "Store", cell: (r) => { const b = storeBrand(r.abbreviation); return <Link href={reportHref("/reports", { ...f, storeId: r.storeId })} className="flex items-center gap-2 font-medium hover:underline"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: b.accent }} />{r.name}</Link>; }, sortable: true, sortValue: (r) => r.name, sticky: true },
     { key: "sync", header: "Synced", cell: (r) => r.lastSyncAt ? <Badge tone={Date.now() - new Date(r.lastSyncAt).getTime() < 36 * 3600e3 ? "success" : "warning"} size="sm" dot>{new Date(r.lastSyncAt).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "numeric", day: "numeric", hour: "numeric" })}</Badge> : <Badge tone="danger" size="sm">never</Badge>, hideOnMobile: true },
-    { key: "roCount", header: f.basis === "opened" ? "ROs opened" : "ROs closed", cell: (r) => fmtNum(r.roCount), sortable: true, sortValue: (r) => r.roCount, align: "right" },
+    { key: "roCount", header: `ROs ${roBasisWord(f.basis)}`, cell: (r) => fmtNum(r.roCount), sortable: true, sortValue: (r) => r.roCount, align: "right" },
     { key: "cpRoCount", header: "CP ROs", cell: (r) => fmtNum(r.cpRoCount), sortable: true, sortValue: (r) => r.cpRoCount, align: "right", hideOnMobile: true },
     { key: "billHours", header: "Bill hrs", cell: (r) => fmtNum(r.billHours, 1), sortable: true, sortValue: (r) => r.billHours, align: "right" },
     { key: "hoursPerRo", header: "Hrs/RO", cell: (r) => fmtNum(r.hoursPerRo, 2), sortable: true, sortValue: (r) => r.hoursPerRo, align: "right", hideOnMobile: true },
@@ -79,7 +85,7 @@ export default function FleetPage() {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label={`ROs ${f.basis}`} value={fmtNum(T.roCount)} subtext={`${rows.length} stores · ${fmtNum(T.cpRoCount)} customer-pay`} />
+        <Stat label={`ROs ${roBasisWord(f.basis)}`} value={fmtNum(T.roCount)} subtext={`${rows.length} stores · ${fmtNum(T.cpRoCount)} customer-pay`} />
         <Stat label="Total sale" value={fmtMoney(T.totalSale)} subtext={`${fmtMoney(T.roCount ? T.totalSale / T.roCount : 0)} / RO`} tone="accent" />
         <Stat label="Billed hours" value={fmtNum(T.billHours, 1)} subtext={`ELR ${T.billHours ? fmtMoney(T.laborSale / T.billHours, 2) : "—"}`} />
         <Stat label="Menu penetration" value={fmtPct(T.roCount ? (T.menuRos / T.roCount) * 100 : 0)} subtext={`${fmtNum(T.menuRos)} menu ROs`} tone="success" />

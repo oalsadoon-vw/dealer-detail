@@ -24,8 +24,9 @@ type DrawerProps = {
   /** Replace the entire header. */
   header?: React.ReactNode;
   size?: Size;
-  /** Side the drawer slides in from. Right by default. */
-  side?: "right" | "left";
+  /** Side the drawer slides in from. Right by default; `bottom` renders a
+   *  bottom sheet (full-width, slides up). */
+  side?: "right" | "left" | "bottom";
   /** Render the close button automatically inside the default header. */
   showClose?: boolean;
   children: React.ReactNode;
@@ -127,15 +128,19 @@ export function Drawer({
   if (!mounted) return null;
 
   const panelPosition =
-    side === "right" ? "right-0" : "left-0";
+    side === "right" ? "right-0" : side === "left" ? "left-0" : "bottom-0";
   const offscreen =
-    side === "right" ? "translate-x-full" : "-translate-x-full";
+    side === "right"
+      ? "translate-x-full"
+      : side === "left"
+        ? "-translate-x-full"
+        : "translate-y-full";
 
   return (
     <div
       className={cn(
         "fixed inset-0 z-50 flex",
-        side === "right" ? "justify-end" : "justify-start"
+        side === "right" ? "justify-end" : side === "left" ? "justify-start" : "items-end justify-center"
       )}
       role="dialog"
       aria-modal="true"
@@ -155,8 +160,8 @@ export function Drawer({
           "relative w-full bg-surface text-fg shadow-xl ring-1 ring-line flex flex-col",
           "transition-transform duration-280 ease-emphasized",
           panelPosition,
-          SIZE[size],
-          visible ? "translate-x-0" : offscreen
+          side === "bottom" ? "max-w-xl rounded-t-2xl max-h-[85vh]" : SIZE[size],
+          visible ? "translate-x-0 translate-y-0" : offscreen
         )}
       >
         {header ?? (

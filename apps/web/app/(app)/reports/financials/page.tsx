@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, DataTable, Button, Skelet
 import { AreaChart } from "@/components/charts/AreaChart";
 import { BarChart } from "@/components/charts/BarChart";
 import { useReport, fmtMoney, fmtNum, fmtPct, fmtDateShort, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { glQuery } from "@/lib/client/report-filters";
 import { useReportsCtx } from "../shell";
 
 type Dept = { sales: number; cost: number; gross: number; grossPct: number; roCount: number; expenses: number };
@@ -27,9 +28,9 @@ const DEPT_LABEL: Record<string, string> = { SERVICE: "Service", PARTS: "Parts",
 
 export default function FinancialsPage() {
   const { f, stores } = useReportsCtx();
-  // Financials have no opened/closed basis — strip it so the cache key stays stable.
-  const query = f.query.replace(/&?basis=[a-z]+/, "");
-  const { data, loading, error } = useReport<Resp>("financials", query);
+  // Financials are GL postings — basis/status/pay are stripped so the GL
+  // query (and cache key) only carries store + range.
+  const { data, loading, error } = useReport<Resp>("financials", glQuery(f));
   const store = stores.find((s) => s.id === f.storeId);
   const [dept, setDept] = useState<"SERVICE" | "PARTS">("SERVICE");
   const [open, setOpen] = useState<Record<string, boolean>>({});

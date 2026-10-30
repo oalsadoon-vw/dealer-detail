@@ -4,7 +4,10 @@ import { useMemo } from "react";
 
 import { Card, CardHeader, CardTitle, CardDescription, DataTable, Button, Skeleton, EmptyState, type Column } from "@/components/ui";
 import { BarChart } from "@/components/charts/BarChart";
+import { OpenRoCaption } from "@/components/reports/OpenRoCaption";
+import { StatusMix } from "@/components/reports/StatusMix";
 import { useReport, fmtMoney, fmtNum, fmtPct, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { resetFilters } from "@/lib/client/report-filters";
 import { useReportsCtx } from "../shell";
 
 type Row = {
@@ -15,6 +18,8 @@ type Row = {
   menuRos: number; menuPenetration: number; cpLaborSale: number; wLaborSale: number; iLaborSale: number;
   cpGross: number; wGross: number; iGross: number; oGross: number; cpLaborGross: number; cpPartsGross: number;
   byPayType: unknown;
+  /** TODO(Lane A): per-status RO counts for the "Status mix" mini-bar. */
+  statusMix?: { posted: number; invoiced: number; open: number };
 };
 type Resp = { rows: Row[] };
 
@@ -33,7 +38,8 @@ export default function AdvisorsPage() {
 
   const columns: Column<Row>[] = [
     { key: "name", header: "Advisor", cell: (r) => <span className="font-medium">{r.name}{r.persona && r.persona !== "SERVICE_ADVISOR" ? <span className="ml-1 text-[10px] text-fg-subtle">{r.persona.replace(/_/g, " ").toLowerCase()}</span> : null}</span>, sortable: true, sortValue: (r) => r.name, sticky: true },
-    { key: "roCount", header: f.basis === "opened" ? "ROs opened" : "ROs closed", cell: (r) => fmtNum(r.roCount), sortable: true, sortValue: (r) => r.roCount, align: "right" },
+    { key: "roCount", header: f.basis === "opened" ? "ROs opened" : f.basis === "closed" ? "ROs closed" : "ROs in range", cell: (r) => fmtNum(r.roCount), sortable: true, sortValue: (r) => r.roCount, align: "right" },
+    { key: "statusMix", header: "Status mix", cell: (r) => <StatusMix data={r.statusMix} />, align: "left", hideOnMobile: true },
     { key: "cpRoCount", header: "CP ROs", cell: (r) => fmtNum(r.cpRoCount), sortable: true, sortValue: (r) => r.cpRoCount, align: "right", hideOnMobile: true },
     { key: "billHours", header: "Bill hrs", cell: (r) => fmtNum(r.billHours, 1), sortable: true, sortValue: (r) => r.billHours, align: "right" },
     { key: "hoursPerRo", header: "Hrs/RO", cell: (r) => fmtNum(r.hoursPerRo, 2), sortable: true, sortValue: (r) => r.hoursPerRo, align: "right", hideOnMobile: true },
@@ -51,7 +57,7 @@ export default function AdvisorsPage() {
 
   if (error) return <EmptyState title="Couldn't load report" description={error} />;
   if (loading || !data) return <Skeleton className="h-96 w-full" />;
-  if (rows.length === 0) return <EmptyState title="No advisor activity in this range" />;
+  if (rows.length === 0) return <EmptyState title="No advisor activity in this range" description="Try a wider date range or a different basis." action={<Button variant="primary" size="sm" onClick={() => resetFilters(f)}>Show everything</Button>} />;
 
   const top = [...rows].sort((a, b) => b.totalSale - a.totalSale).slice(0, 12);
 
@@ -63,16 +69,18 @@ export default function AdvisorsPage() {
           <BarChart title="" data={top.map((r) => ({ label: r.name.split(" ")[0], value: r.totalSale }))} height={220} valueFormatter={(v) => fmtMoney(v)} />
         </Card>
         <Card>
-          <CardHeader><CardTitle>{f.basis === "opened" ? "ROs opened" : "ROs closed"} by advisor</CardTitle><CardDescription>Count of repair orders</CardDescription></CardHeader>
+          <CardHeader><CardTitle>{f.basis === "opened" ? "ROs opened" : f.basis === "closed" ? "ROs closed" : "ROs in range"} by advisor</CardTitle><CardDescription>Count of repair orders</CardDescription></CardHeader>
           <BarChart title="" data={[...rows].sort((a, b) => b.roCount - a.roCount).slice(0, 12).map((r) => ({ label: r.name.split(" ")[0], value: r.roCount }))} height={220} valueFormatter={(v) => fmtNum(v)} color="#16a34a" />
         </Card>
       </div>
+
+      <OpenRoCaption f={f} />
 
       <Card padded={false}>
         <div className="flex items-center justify-between p-4 pb-2">
           <CardHeader>
             <CardTitle>Advisor performance</CardTitle>
-            <CardDescription>{fmtNum(totals.roCount)} ROs · {fmtNum(totals.billHours, 1)} hrs · {fmtMoney(totals.totalSale)} sale · ELR {totals.billHours ? fmtMoney(totals.laborSale / totals.billHours, 2) : "—"} · menu {totals.roCount ? fmtPct((totals.menuRos / totals.roCount) * 100, 0) : "—"}<br />Gross: CP {fmtMoney(totals.cpGross)} · Warranty {fmtMoney(totals.wGross)} · Internal {fmtMoney(totals.iGross)}{totals.oGross ? ` · Other ${fmtMoney(totals.oGross)}` : ""} · <span className="font-medium">Total {fmtMoney(totals.totalGross)}</span> ({f.basis === "closed" ? "CLOSED ROs by close date" : "ROs by open date"}; gross = sale − cost, labor + parts)</CardDescription>
+            <CardDescription>{fmtNum(totals.roCount)} ROs · {fmtNum(totals.billHours, 1)} hrs · {fmtMoney(totals.totalSale)} sale · ELR {totals.billHours ? fmtMoney(totals.laborSale / totals.billHours, 2) : "—"} · menu {totals.roCount ? fmtPct((totals.menuRos / totals.roCount) * 100, 0) : "—"}<br />Gross: CP {fmtMoney(totals.cpGross)} · Warranty {fmtMoney(totals.wGross)} · Internal {fmtMoney(totals.iGross)}{totals.oGross ? ` · Other ${fmtMoney(totals.oGross)}` : ""} · <span className="font-medium">Total {fmtMoney(totals.totalGross)}</span> ({f.basis === "closed" ? "CLOSED ROs by close date" : f.basis === "opened" ? "ROs by open date" : "ROs opened or closed in range"}; gross = sale − cost, labor + parts)</CardDescription>
           </CardHeader>
           <Button size="sm" variant="subtle" onClick={() => downloadCsv(`${store?.abbreviation ?? "store"}-advisors-${f.basis}-${f.startDate}_${f.endDate}.csv`, toCsv(rows.map(({ advisorId: _a, byPayType: _b, ...r }) => r)))}>Export CSV</Button>
         </div>

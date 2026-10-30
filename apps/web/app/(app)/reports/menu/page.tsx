@@ -2,7 +2,9 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, DataTable, Stat, Button, Skeleton, EmptyState, type Column } from "@/components/ui";
 import { BarChart } from "@/components/charts/BarChart";
+import { OpenRoCaption } from "@/components/reports/OpenRoCaption";
 import { useReport, fmtMoney, fmtNum, fmtPct, fmtDateShort, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { resetFilters } from "@/lib/client/report-filters";
 import { useReportsCtx } from "../shell";
 
 type AdvRow = { advisorId: string; name: string; roCount: number; menuRos: number; menuLines: number; penetration: number; menuLaborSale: number; menuPartsSale: number; menuTotal: number };
@@ -32,12 +34,12 @@ export default function MenuSalesPage() {
   if (error) return <EmptyState title="Couldn't load report" description={error} />;
   if (loading || !data) return <Skeleton className="h-96 w-full" />;
   const t = data.totals;
-  if (t.roCount === 0) return <EmptyState title="No ROs in this range" />;
+  if (t.roCount === 0) return <EmptyState title="No ROs in this range" description="Try a wider date range or a different basis." action={<Button variant="primary" size="sm" onClick={() => resetFilters(f)}>Show everything</Button>} />;
 
   const advCols: Column<AdvRow>[] = [
     { key: "name", header: "Advisor", cell: (r) => <span className="font-medium">{r.name}</span>, sortable: true, sortValue: (r) => r.name, sticky: true },
     { key: "menuRos", header: "Menus sold", cell: (r) => <span className="font-semibold">{fmtNum(r.menuRos)}</span>, sortable: true, sortValue: (r) => r.menuRos, align: "right" },
-    { key: "roCount", header: f.basis === "opened" ? "ROs opened" : "ROs closed", cell: (r) => fmtNum(r.roCount), sortable: true, sortValue: (r) => r.roCount, align: "right" },
+    { key: "roCount", header: f.basis === "opened" ? "ROs opened" : f.basis === "closed" ? "ROs closed" : "ROs in range", cell: (r) => fmtNum(r.roCount), sortable: true, sortValue: (r) => r.roCount, align: "right" },
     { key: "penetration", header: "Penetration", cell: (r) => fmtPct(r.penetration, 0), sortable: true, sortValue: (r) => r.penetration, align: "right" },
     { key: "menuLaborSale", header: "Menu labor", cell: (r) => fmtMoney(r.menuLaborSale), sortable: true, sortValue: (r) => r.menuLaborSale, align: "right", hideOnMobile: true },
     { key: "menuPartsSale", header: "Menu parts", cell: (r) => fmtMoney(r.menuPartsSale), sortable: true, sortValue: (r) => r.menuPartsSale, align: "right", hideOnMobile: true },
@@ -57,10 +59,12 @@ export default function MenuSalesPage() {
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Menus sold" value={fmtNum(t.menuRos)} subtext={`${fmtNum(t.lines)} menu lines`} tone="accent" spark={{ data: data.series.map((d) => ({ value: d.menuRos })) }} />
-        <Stat label="Penetration" value={fmtPct(t.penetration)} subtext={`of ${fmtNum(t.roCount)} ROs ${f.basis}`} />
+        <Stat label="Penetration" value={fmtPct(t.penetration)} subtext={`of ${fmtNum(t.roCount)} ROs ${f.basis === "opened" ? "opened" : f.basis === "closed" ? "closed" : "in range"}`} />
         <Stat label="Menu revenue" value={fmtMoney(t.menuTotal)} subtext={`labor ${fmtMoney(t.menuLaborSale)} · parts ${fmtMoney(t.menuPartsSale)}`} tone="success" spark={{ data: data.series.map((d) => ({ value: d.menuTotal })) }} />
         <Stat label="Avg menu ticket" value={fmtMoney(t.menuRos ? t.menuTotal / t.menuRos : 0)} subtext="menu $ ÷ menus sold" />
       </div>
+
+      <OpenRoCaption f={f} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
