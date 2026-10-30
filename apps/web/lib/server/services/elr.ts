@@ -38,6 +38,7 @@ import { prisma } from "@/lib/db";
 import type { TenantContext } from "@/lib/server/tenant-context";
 import { requireStoreAccess } from "@/lib/server/authz";
 import type { ReportRange } from "./reports";
+import { resolvePayClasses, resolveStatuses } from "./reports";
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -127,13 +128,25 @@ function payTypeExclusions(toyota: boolean): Prisma.Sql {
     : Prisma.empty;
 }
 
+/**
+ * RO filter predicate (on alias o = RoOpFact shared by both queries).
+ *   opened   → openDate in range, roStatus in selection, payClass in selection
+ *   closed   → firstCloseDate in range, roStatus in selection (no hard CLOSED)
+ *   activity → (openDate OR firstCloseDate) in range, roStatus + payClass in
+ *              selection. Ops are rows in RoOpFact; the ELR "RO" count is a
+ *              count(DISTINCT documentId) so an RO with mixed pay types counts
+ *              once per bucket.
+ */
 function baseWhere(range: ReportRange): Prisma.Sql {
-  const col = range.basis === "opened" ? Prisma.sql`o."openDate"` : Prisma.sql`o."closeDate"`;
-  const closedOnly = range.basis !== "opened" ? Prisma.sql`AND o."roStatus" = 'CLOSED'` : Prisma.empty;
-  return Prisma.sql`o."storeId" = ${range.storeId}
-    AND ${col} >= ${new Date(`${range.startDate}T00:00:00.000Z`)}
-    AND ${col} <= ${new Date(`${range.endDate}T00:00:00.000Z`)}
-    ${closedOnly}`;
+  const gte = new Date(`${range.startDate}T00:00:00.000Z`);
+  const lte = new Date(`${range.endDate}T00:00:00.000Z`);
+  const statusIn = Prisma.sql`AND o."roStatus" IN (${Prisma.join(resolveStatuses(range.statuses).map((s) => Prisma.sql`${s}`))})`;
+  const payIn = Prisma.sql`AND o."payClass" IN (${Prisma.join(resolvePayClasses(range.payClasses).map((p) => Prisma.sql`${p}`))})`;
+  let date: Prisma.Sql;
+  if (range.basis === "opened") date = Prisma.sql`o."openDate" >= ${gte} AND o."openDate" <= ${lte}`;
+  else if (range.basis === "activity") date = Prisma.sql`((o."openDate" >= ${gte} AND o."openDate" <= ${lte}) OR (o."firstCloseDate" >= ${gte} AND o."firstCloseDate" <= ${lte}))`;
+  else date = Prisma.sql`o."firstCloseDate" >= ${gte} AND o."firstCloseDate" <= ${lte}`;
+  return Prisma.sql`o."storeId" = ${range.storeId} AND ${date} ${statusIn} ${payIn}`;
 }
 
 type Agg = { ls: number | null; bh: number | null; ros: number | null };
@@ -192,7 +205,9 @@ export async function getElr(tc: TenantContext, range: ReportRange) {
   const end = new Date(`${range.endDate}T00:00:00.000Z`);
   const trendStart = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - 11, 1));
   const trendWhere = baseWhere({ ...range, startDate: trendStart.toISOString().slice(0, 10) });
-  const col = range.basis === "opened" ? Prisma.sql`o."openDate"` : Prisma.sql`o."closeDate"`;
+  // Monthly buckets key on the original close date (firstCloseDate) for
+  // closed/activity — a re-closed RO stays in its original month (D10).
+  const col = range.basis === "opened" ? Prisma.sql`o."openDate"` : Prisma.sql`coalesce(o."firstCloseDate", o."openDate")`;
   const trendKeys: ElrBucketKey[] = toyota ? ["cp", "warranty", "internal", "total", "txm", "toyotaCare", "prepaid", "pdi"] : ["cp", "warranty", "internal", "total", "pdi"];
   // One grouped-by-month scan with a FILTER pair per bucket (was 8 full
   // 12-month joined scans in parallel).
@@ -229,7 +244,7 @@ export async function getElr(tc: TenantContext, range: ReportRange) {
 }
 
 /** Fleet view: CP / W / I / total ELR for every accessible store over one window. */
-export async function getElrFleet(tc: TenantContext, p: { startDate: string; endDate: string; basis: ReportRange["basis"] }) {
+export async function getElrFleet(tc: TenantContext, p: { startDate: string; endDate: string; basis: ReportRange["basis"]; statuses?: string[]; payClasses?: ReportRange["payClasses"] }) {
   const stores = await prisma.store.findMany({
     where: { id: { in: tc.org.accessibleStoreIds }, organizationId: tc.org.organizationId },
     select: { id: true, name: true, abbreviation: true },
@@ -237,8 +252,12 @@ export async function getElrFleet(tc: TenantContext, p: { startDate: string; end
   });
   // One grouped query for every store (Toyota carve-outs applied in SQL per
   // store) instead of N joined queries in parallel through the pool.
-  const col = p.basis === "opened" ? Prisma.sql`o."openDate"` : Prisma.sql`o."closeDate"`;
-  const closedOnly = p.basis !== "opened" ? Prisma.sql`AND o."roStatus" = 'CLOSED'` : Prisma.empty;
+  const statusIn = Prisma.sql`AND o."roStatus" IN (${Prisma.join(resolveStatuses(p.statuses).map((s) => Prisma.sql`${s}`))})`;
+  const payIn = Prisma.sql`AND o."payClass" IN (${Prisma.join(resolvePayClasses(p.payClasses).map((pc) => Prisma.sql`${pc}`))})`;
+  let date: Prisma.Sql;
+  if (p.basis === "opened") date = Prisma.sql`o."openDate" >= ${new Date(`${p.startDate}T00:00:00.000Z`)} AND o."openDate" <= ${new Date(`${p.endDate}T00:00:00.000Z`)}`;
+  else if (p.basis === "activity") date = Prisma.sql`((o."openDate" >= ${new Date(`${p.startDate}T00:00:00.000Z`)} AND o."openDate" <= ${new Date(`${p.endDate}T00:00:00.000Z`)}) OR (o."firstCloseDate" >= ${new Date(`${p.startDate}T00:00:00.000Z`)} AND o."firstCloseDate" <= ${new Date(`${p.endDate}T00:00:00.000Z`)}))`;
+  else date = Prisma.sql`o."firstCloseDate" >= ${new Date(`${p.startDate}T00:00:00.000Z`)} AND o."firstCloseDate" <= ${new Date(`${p.endDate}T00:00:00.000Z`)}`;
   const toyotaIds = stores.filter((s) => isToyotaStore(s.abbreviation)).map((s) => s.id);
   const toyotaEx = toyotaIds.length
     ? Prisma.sql`AND NOT (o."storeId" IN (${Prisma.join(toyotaIds)}) AND ((o."payClass" = 'CP' AND o.opcode ~ '^(TAC|TSC)') OR (o."payClass" = 'I' AND o.opcode = 'PDI')))`
@@ -247,8 +266,7 @@ export async function getElrFleet(tc: TenantContext, p: { startDate: string; end
     SELECT o."storeId", o."payClass" AS pc, sum(o."laborSale")::float AS ls, sum(o."billHours")::float AS bh
     FROM "RoOpFact" o
     WHERE o."storeId" IN (${Prisma.join(stores.map((s) => s.id))})
-      AND ${col} >= ${new Date(`${p.startDate}T00:00:00.000Z`)} AND ${col} <= ${new Date(`${p.endDate}T00:00:00.000Z`)}
-      ${closedOnly} ${toyotaEx}
+      AND ${date} ${statusIn} ${payIn} ${toyotaEx}
     GROUP BY 1, 2`);
   const rows = stores.map((s) => {
       const agg = all.filter((a) => a.storeId === s.id);

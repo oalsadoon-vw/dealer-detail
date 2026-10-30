@@ -389,27 +389,87 @@ export async function buildRoFacts(params: BuildRoFactsParams): Promise<BuildRoF
 
     const docIds = built.map((b) => b.f.ro.documentId);
     await prisma.$transaction(async (tx) => {
-      // Capture old close/open dates so callers can re-aggregate moved ROs.
+      // Capture old close/open dates AND the first-close / status history so
+      // callers can re-aggregate moved ROs and we can persist the D10/D11
+      // firstCloseDate + reopen/status-event bookkeeping across the rebuild.
       const old = await tx.roFact.findMany({
         where: { storeId, documentId: { in: docIds } },
-        select: { openDate: true, closeDate: true },
+        select: {
+          documentId: true, status: true, openDate: true, closeDate: true,
+          firstCloseDate: true, wasReclosed: true, reopenCount: true,
+          lastReopenedAt: true, lastReclosedAt: true, laborSale: true, partsSale: true,
+        },
       });
       for (const o of old) {
         openDates.set(o.openDate.getTime(), o.openDate);
         if (o.closeDate) closeDates.set(o.closeDate.getTime(), o.closeDate);
       }
+      const oldByDoc = new Map(old.map((o) => [o.documentId, o]));
       await tx.roFact.deleteMany({ where: { storeId, documentId: { in: docIds } } }); // cascades ops
 
+      const now = new Date();
+      const statusEvents: any[] = [];
       const factRows = built.map(({ f, advisorId }) => {
         const { advisorName: _n, ...rest } = f.ro; void _n;
-        return { ...rest, storeId, advisorId };
+        const newStatus = f.ro.status ? String(f.ro.status).toUpperCase() : null;
+        const newCloseDate = f.ro.closeDate ?? null;
+        const existing = oldByDoc.get(f.ro.documentId);
+        const oldStatus = existing?.status != null ? String(existing.status).toUpperCase() : null;
+
+        // D10: firstCloseDate is set on first observation in CLOSED and NEVER
+        // overwritten — Tekion clobbers closedTime on re-close, so we keep the
+        // original close month for Closed/Activity reports.
+        let firstCloseDate: Date | null = existing?.firstCloseDate ?? null;
+        if (firstCloseDate == null && newStatus === "CLOSED") firstCloseDate = newCloseDate;
+
+        let wasReclosed = existing?.wasReclosed ?? false;
+        let reopenCount = existing?.reopenCount ?? 0;
+        let lastReopenedAt: Date | null = existing?.lastReopenedAt ?? null;
+        let lastReclosedAt: Date | null = existing?.lastReclosedAt ?? null;
+
+        if (existing) {
+          if (oldStatus !== newStatus) {
+            // D11: on ANY observed status change, write a RoStatusEvent row.
+            statusEvents.push({
+              documentId: f.ro.documentId,
+              storeId,
+              roFactId: "", // patched once the new RoFact id is known
+              documentNumber: f.ro.documentNumber,
+              fromStatus: existing.status != null ? existing.status : null,
+              toStatus: newStatus ?? "",
+              observedAt: now,
+              closeDateBefore: existing.closeDate,
+              closeDateAfter: newCloseDate,
+              laborSaleBefore: existing.laborSale,
+              laborSaleAfter: f.ro.laborSale,
+              partsSaleBefore: existing.partsSale,
+              partsSaleAfter: f.ro.partsSale,
+            });
+          }
+          if (oldStatus === "CLOSED" && newStatus !== "CLOSED") {
+            reopenCount += 1;
+            lastReopenedAt = now;
+          }
+          if (oldStatus !== "CLOSED" && existing.firstCloseDate != null && newStatus === "CLOSED") {
+            wasReclosed = true;
+            lastReclosedAt = now;
+          }
+          if (existing.wasReclosed) wasReclosed = true;
+        }
+        return { ...rest, storeId, advisorId, firstCloseDate, wasReclosed, reopenCount, lastReopenedAt, lastReclosedAt };
       });
       const createdFacts = await tx.roFact.createManyAndReturn({
         data: factRows,
         select: { id: true, documentId: true },
       });
       const factIdByDoc = new Map(createdFacts.map((c) => [c.documentId, c.id]));
+      if (statusEvents.length) {
+        await tx.roStatusEvent.createMany({
+          data: statusEvents.map(({ documentId, ...e }) => ({ ...e, roFactId: factIdByDoc.get(documentId) ?? "" })),
+        });
+      }
 
+      const firstCloseByDoc = new Map(factRows.map((r) => [r.documentId, r.firstCloseDate as Date | null]));
       const opRows = built.flatMap(({ f, advisorId }) =>
         f.ops.map((op) => ({
           ...op,
@@ -420,6 +480,7 @@ export async function buildRoFacts(params: BuildRoFactsParams): Promise<BuildRoF
           advisorId,
           openDate: f.ro.openDate,
           closeDate: f.ro.closeDate,
+          firstCloseDate: firstCloseByDoc.get(f.ro.documentId) ?? null,
           roStatus: f.ro.status,
         })),
       );

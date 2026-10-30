@@ -25,6 +25,15 @@ const TOLERANCE = Number(process.env.TIEOUT_TOLERANCE ?? 100);
 const CHANNEL = process.env.SLACK_CHANNEL ?? "C0B8EPN76GJ";
 const ROWS = 200;
 
+// --status CLOSED,INVOICED  → compare against Tekion for those statuses (Sean's
+//                             Advisor Performance = CLOSED + INVOICED).
+// --date-field current|first → RoFact.closeDate (Tekion closedTime search) vs
+//                              RoFact.firstCloseDate (Tekion firstClosedTime).
+const STATUSES = opt("--status", "CLOSED").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+const DATE_FIELD = (opt("--date-field", "current").toLowerCase() === "first" ? "first" : "current") as "current" | "first";
+const SITE_COL = DATE_FIELD === "current" ? "closeDate" : "firstCloseDate";
+const TEKION_FIELD = DATE_FIELD === "current" ? "closedTime" : "firstClosedTime";
+
 function ptYmdNow(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: PT, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
@@ -66,12 +75,12 @@ async function tekionTotals(client: TekionInternalClient, dealer: string, fromMs
   const seen = new Set<string>();
   for (let start = 0; ; start += ROWS) {
     const body = {
-      pageInfo: { start, rows: ROWS }, sort: [{ order: "ASC", field: "closedTime" }], searchText: null,
+      pageInfo: { start, rows: ROWS }, sort: [{ order: "ASC", field: TEKION_FIELD }], searchText: null,
       filters: [
         { operator: "IN", values: [false], field: "migrated" },
-        { operator: "IN", values: ["CLOSED"], field: "status" },
-        { operator: "GTE", values: [fromMs], field: "closedTime" },
-        { operator: "LTE", values: [toMs], field: "closedTime" },
+        { operator: "IN", values: STATUSES, field: "status" },
+        { operator: "GTE", values: [fromMs], field: TEKION_FIELD },
+        { operator: "LTE", values: [toMs], field: TEKION_FIELD },
       ],
       searchFields: ["RO_NO"],
     };
@@ -111,7 +120,7 @@ async function main(): Promise<number> {
     try { tek = await tekionTotals(client, dealer, fromMs, toMs); }
     catch (e) { rows.push(`${ab.padEnd(5)} tekion ERR ${(e as Error).message.slice(0, 80)}`); drift.push(`${ab}: could not read Tekion`); continue; }
     const agg = await prisma.roFact.aggregate({
-      where: { storeId: s.id, status: "CLOSED", closeDate: { gte, lte } },
+      where: { storeId: s.id, status: { in: STATUSES }, [SITE_COL]: { gte, lte } },
       _count: { _all: true }, _sum: { laborSale: true, partsSale: true },
     });
     const site: Totals = { ros: agg._count._all, labor: agg._sum.laborSale ?? 0, parts: agg._sum.partsSale ?? 0 };
@@ -122,7 +131,7 @@ async function main(): Promise<number> {
     if (!ok) drift.push(`${ab}: labor Δ$${money(dl)}, parts Δ$${money(dp)}, ROs ${site.ros}/${tek.ros}`);
   }
   const table = rows.join("\n");
-  console.log(`site(closed basis, status=CLOSED) vs Tekion paySplitTotalsV3, ${from}..${to} PT, tolerance $${TOLERANCE}\n${table}`);
+  console.log(`site(${SITE_COL}, status=${STATUSES.join(",")}) vs Tekion(${TEKION_FIELD}) paySplitTotalsV3, ${from}..${to} PT, tolerance $${TOLERANCE}\n${table}`);
   if (flag("--slack")) {
     await postSlack(drift.length
       ? `:warning: *fixedopsreports $ tie-out ${from}..${to}* — ${drift.length} store(s) drift >$${TOLERANCE}\n\`\`\`\n${table}\n\`\`\``

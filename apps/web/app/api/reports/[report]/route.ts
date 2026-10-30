@@ -4,6 +4,7 @@ import { z } from "zod";
 import { withAuth } from "@/lib/auth/api-guard";
 import {
   getAdvisorPerformance,
+  getComposition,
   getFleetRollup,
   getMenuSales,
   getOpcodeExplorer,
@@ -25,7 +26,13 @@ const Ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const Base = z.object({
   startDate: Ymd,
   endDate: Ymd,
-  basis: z.enum(["opened", "closed"]).default("closed"),
+  // Activity is the default: "everything that touched the shop this period" (D1/D2).
+  basis: z.enum(["activity", "opened", "closed"]).default("activity"),
+  // Comma-separated canonical Tekion statuses (OPEN alias = the six non-terminal
+  // statuses). Absent → every status except VOIDED (D6).
+  status: z.string().optional(),
+  // Comma-separated pay classes CP,W,I,O. Absent → all four (D5).
+  pay: z.string().optional(),
 });
 const StoreBase = Base.extend({ storeId: z.string().uuid() });
 
@@ -33,6 +40,7 @@ const Schemas = {
   summary: StoreBase,
   advisors: StoreBase,
   menu: StoreBase,
+  composition: StoreBase,
   opcodes: StoreBase.extend({
     opcodes: z.string().optional(), // comma-separated
     search: z.string().optional(),
@@ -74,6 +82,13 @@ export const GET = withAuth<{ params: { report: string } }>(async (req, ctx, tc)
   }
   const q = parsed.data as any;
   const splitOps = (s?: string) => (s ? s.split(",").map((x) => x.trim()).filter(Boolean) : undefined);
+  // status/pay are csv params; expand to arrays. OPEN alias is resolved by the
+  // service's resolveStatuses() (route only splits the csv).
+  const splitCsv = (s?: string) => (s ? s.split(",").map((x) => x.trim().toUpperCase()).filter(Boolean) : undefined);
+  q.statuses = splitCsv(q.status);
+  q.payClasses = splitCsv(q.pay);
+  delete q.status;
+  delete q.pay;
 
   try {
     let data: unknown;
@@ -81,6 +96,7 @@ export const GET = withAuth<{ params: { report: string } }>(async (req, ctx, tc)
       case "summary":  data = await getSummary(tc, q); break;
       case "advisors": data = await getAdvisorPerformance(tc, q); break;
       case "menu":     data = await getMenuSales(tc, q); break;
+      case "composition": data = await getComposition(tc, q); break;
       case "opcodes":  data = await getOpcodeExplorer(tc, { ...q, opcodes: splitOps(q.opcodes) }); break;
       case "lines":    data = await getOpcodeLines(tc, { ...q, opcodes: splitOps(q.opcodes) }); break;
       case "ros":      data = await getRoList(tc, q); break;

@@ -138,6 +138,7 @@ model Store {
   opcodeCategories OpcodeCategory[]
   roFacts          RoFact[]
   roOpFacts        RoOpFact[]
+  statusEvents     RoStatusEvent[]
   glAccountDaily   GlAccountDaily[]
 
   @@unique([abbreviation])
@@ -471,7 +472,17 @@ model RoFact {
 
   // Pacific-time business dates (midnight UTC date-only)
   openDate  DateTime           // from CHECKIN_TIME / creationTime
-  closeDate DateTime?          // from schedule CLOSED_TIME (fallback INVOICED_TIME, then modifiedTime if terminal)
+  closeDate DateTime?          // Tekion's CURRENT close (schedule CLOSED_TIME; fallback
+                               // INVOICED_TIME then modifiedTime if terminal) — needed
+                               // for the Tekion-exact tie-out.
+  // Original close (D10): first observation in CLOSED. NEVER overwritten — Tekion
+  // clobbers closedTime on re-close, so reports window Closed/Activity basis on
+  // this column (a re-closed RO stays in its original month).
+  firstCloseDate DateTime?
+  wasReclosed    Boolean  @default(false)
+  reopenCount    Int      @default(0)
+  lastReopenedAt DateTime?
+  lastReclosedAt DateTime?
   openTs    DateTime
   closeTs   DateTime?
   isClosed  Boolean  @default(false)
@@ -514,10 +525,13 @@ model RoFact {
   isCpRo      Boolean @default(false)   // any CP dollars on the RO
 
   ops RoOpFact[]
+  statusEvents RoStatusEvent[]
 
   @@unique([storeId, documentId])
   @@index([storeId, openDate])
   @@index([storeId, closeDate])
+  @@index([storeId, status, firstCloseDate])
+  @@index([storeId, status, openDate])
   @@index([storeId, advisorId, closeDate])
   @@index([storeId, advisorId, openDate])
 }
@@ -538,6 +552,9 @@ model RoOpFact {
 
   openDate  DateTime
   closeDate DateTime?
+  /// Denormalized RoFact.firstCloseDate so Closed/Activity basis reports filter on
+  /// this table alone (same no-join rationale as roStatus).
+  firstCloseDate DateTime?
   /// Denormalized RoFact.status so closed-basis reports filter on this table
   /// alone (the RoOpFact→RoFact join forced a full RoFact seq scan: 6–7 s/store).
   roStatus  String?
@@ -569,10 +586,38 @@ model RoOpFact {
   @@index([storeId, category, closeDate])
   @@index([storeId, isMenuSale, closeDate])
   @@index([storeId, roStatus, closeDate])
+  @@index([storeId, roStatus, firstCloseDate])
   @@index([storeId, advisorId, roStatus, closeDate])
   @@index([roFactId])
   // + covering indexes RoOpFact_cover_{closed,opened}_idx (INCLUDE ... — not
   //   expressible in Prisma schema; see migration 20261024183000).
+}
+
+model RoStatusEvent {
+  id        String   @id @default(uuid())
+  observedAt DateTime @default(now())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  roFactId String
+  roFact   RoFact @relation(fields: [roFactId], references: [id], onDelete: Cascade)
+
+  documentNumber String
+
+  fromStatus String?
+  toStatus   String
+
+  closeDateBefore DateTime?
+  closeDateAfter  DateTime?
+
+  laborSaleBefore Float?
+  laborSaleAfter  Float?
+  partsSaleBefore Float?
+  partsSaleAfter  Float?
+
+  @@index([storeId, observedAt])
+  @@index([roFactId])
 }
 
 model OpcodeCategory {
