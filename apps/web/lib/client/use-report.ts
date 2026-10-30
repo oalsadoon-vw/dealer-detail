@@ -46,6 +46,15 @@ export function useReport<T>(kind: string, query: string, extra?: Record<string,
 
 export const fmtMoney = (n: number | null | undefined, digits = 0) =>
   n == null ? "—" : n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: digits, minimumFractionDigits: digits });
+
+/** Compact dollar shorthand for chips/badges: $0 · $90.7K · $1.2M. */
+export const fmtCompact = (n: number | null | undefined): string => {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000) return `$${(n / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1)}M`;
+  if (abs >= 1_000) return `$${(n / 1_000).toFixed(abs >= 100_000 ? 0 : 1)}K`;
+  return `$${Math.round(n).toLocaleString("en-US")}`;
+};
 export const fmtNum = (n: number | null | undefined, digits = 0) =>
   n == null ? "—" : n.toLocaleString("en-US", { maximumFractionDigits: digits, minimumFractionDigits: digits });
 export const fmtPct = (n: number | null | undefined, digits = 1) => (n == null ? "—" : `${n.toFixed(digits)}%`);

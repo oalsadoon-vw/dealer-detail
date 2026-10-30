@@ -140,7 +140,7 @@ export default function ElrPage() {
           />
         </Card>
         <Card>
-          <CardHeader><CardTitle>Customer Pay ELR trend</CardTitle><CardDescription>Trailing 12 months, by {f.basis} date</CardDescription></CardHeader>
+          <CardHeader><CardTitle>Customer Pay ELR trend</CardTitle><CardDescription>{`Trailing 12 months, by ${f.basis === "closed" ? "close date" : f.basis === "opened" ? "open date" : "RO activity (opened or closed)"}`}</CardDescription></CardHeader>
           <BarChart title="" data={data.series.map((d) => ({ label: monthLabel(d.month), value: d.cp ?? 0 }))} height={240} valueFormatter={(v) => fmtMoney(v, 0)} color="#16a34a" />
         </Card>
       </div>

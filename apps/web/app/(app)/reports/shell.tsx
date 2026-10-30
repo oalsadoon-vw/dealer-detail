@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 
 import { SectionHeading, Skeleton } from "@/components/ui";
 import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
+import { CompositionStrip } from "@/components/reports/CompositionStrip";
 import { reportHref, useReportFilters, type ReportFilters, type StoreOpt } from "@/lib/client/report-filters";
 import { storeBrand } from "@/lib/client/store-brand";
 
@@ -75,6 +76,20 @@ function Inner({ stores, children }: { stores: StoreOpt[]; children: React.React
         </nav>
 
         <ReportFilterBar stores={isFleet ? [] : stores} f={f} />
+        {/*
+          Composition strip ("what makes up the number") — every RO-scoped
+          page except fleet. The composition endpoint is store-scoped
+          (storeId required); fleet would need a fleet-wide composition shape,
+          so it's hidden here for now.
+          TODO(Lane A): add fleet composition (no store param) and render it
+          here for /reports/fleet.
+        */}
+        {/* The composition strip is RO-scoped (status/pay toggles + RO $).
+            Financials are GL postings where those filters don't apply, so the
+            strip is skipped there rather than showing controls that do nothing. */}
+        {!isFleet && !isFinancials && (
+          <CompositionStrip f={f} accent={brand.accent} accentFg={brand.fg} />
+        )}
         {children}
       </main>
     </Ctx.Provider>

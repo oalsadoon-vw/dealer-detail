@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 
 import { Card, CardHeader, CardTitle, CardDescription, DataTable, Stat, Button, Input, Select, FormField, Skeleton, EmptyState, type Column } from "@/components/ui";
 import { BarChart } from "@/components/charts/BarChart";
+import { OpenRoCaption } from "@/components/reports/OpenRoCaption";
 import { useReport, fmtMoney, fmtNum, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { resetFilters } from "@/lib/client/report-filters";
 import { useReportsCtx } from "../shell";
 
 type Money = { laborSale: number; laborGross: number; partsSale: number; partsGross: number; total: number; billHours: number; partsQty: number };
@@ -61,7 +63,7 @@ export default function OpcodesPage() {
   ];
   const lineCols: Column<Line>[] = [
     { key: "ro", header: "RO", cell: (r) => <span className="font-medium tabular-nums">{r.ro}</span>, sortable: true, sortValue: (r) => r.ro, sticky: true },
-    { key: "date", header: f.basis === "opened" ? "Opened" : "Closed", cell: (r) => (f.basis === "opened" ? r.openDate : r.closeDate) ?? "—", sortable: true, sortValue: (r) => (f.basis === "opened" ? r.openDate : r.closeDate) ?? "" },
+    { key: "date", header: f.basis === "opened" ? "Opened" : f.basis === "closed" ? "Closed" : "Date", cell: (r) => (f.basis === "opened" ? r.openDate : f.basis === "closed" ? r.closeDate : (r.closeDate ?? r.openDate)) ?? "—", sortable: true, sortValue: (r) => (f.basis === "opened" ? r.openDate : f.basis === "closed" ? r.closeDate : (r.closeDate ?? r.openDate)) ?? "" },
     { key: "advisor", header: "Advisor", cell: (r) => r.advisor, sortable: true, sortValue: (r) => r.advisor },
     { key: "vehicle", header: "Vehicle", cell: (r) => <span title={r.vin ?? ""}>{r.vehicle}{r.mileage ? <span className="text-fg-subtle"> · {fmtNum(r.mileage)} mi</span> : null}</span>, hideOnMobile: true },
     { key: "opcode", header: "Opcode", cell: (r) => <span title={r.description ?? ""}>{r.opcode}</span>, sortable: true, sortValue: (r) => r.opcode },
@@ -106,7 +108,8 @@ export default function OpcodesPage() {
             <Stat label="Parts qty" value={fmtNum(data.opcodes.reduce((s, o) => s + o.partsQty, 0))} subtext="units on matching lines" />
             <Stat label="Billed hours" value={fmtNum(data.opcodes.reduce((s, o) => s + o.billHours, 0), 1)} />
           </div>
-          {data.totalLines === 0 ? <EmptyState title="No matching operations" description="Try a broader search or a different date basis." /> : (
+          <OpenRoCaption f={f} />
+          {data.totalLines === 0 ? <EmptyState title="No matching operations" description="Try a broader search or a different date basis." action={<Button variant="primary" size="sm" onClick={() => resetFilters(f)}>Show everything</Button>} /> : (
             <>
               <Card>
                 <CardHeader><CardTitle>Sold by advisor</CardTitle><CardDescription>Click an advisor for RO-level detail</CardDescription></CardHeader>

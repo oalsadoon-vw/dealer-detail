@@ -3,7 +3,9 @@
 import { useState } from "react";
 
 import { Card, CardHeader, CardTitle, CardDescription, DataTable, Button, Tabs, Badge, Skeleton, EmptyState, type Column } from "@/components/ui";
+import { OpenRoCaption } from "@/components/reports/OpenRoCaption";
 import { useReport, fmtMoney, fmtNum, toCsv, downloadCsv } from "@/lib/client/use-report";
+import { resetFilters } from "@/lib/client/report-filters";
 import { useReportsCtx } from "../shell";
 
 type Ro = {
@@ -46,13 +48,15 @@ export default function RoListPage() {
   ];
 
   const tot = rows.reduce((t, r) => ({ n: t.n + 1, sale: t.sale + r.totalSale, hrs: t.hrs + r.billHours, closed: t.closed + (r.isClosed ? 1 : 0) }), { n: 0, sale: 0, hrs: 0, closed: 0 });
+  const basisAdj = f.basis === "opened" ? "opened " : f.basis === "closed" ? "closed " : "";
 
   return (
     <div className="space-y-4">
+      <OpenRoCaption f={f} />
       <Card padded={false}>
         <div className="flex flex-wrap items-center justify-between gap-3 p-4 pb-2">
           <CardHeader>
-            <CardTitle>Repair orders {f.basis === "opened" ? "opened" : "closed"} in range</CardTitle>
+            <CardTitle>Repair orders {basisAdj}in range</CardTitle>
             <CardDescription>{loading ? "Loading…" : `${fmtNum(tot.n)} ROs · ${fmtNum(tot.closed)} closed · ${fmtNum(tot.hrs, 1)} hrs · ${fmtMoney(tot.sale)}`}</CardDescription>
           </CardHeader>
           <div className="flex items-center gap-2">
@@ -61,7 +65,7 @@ export default function RoListPage() {
           </div>
         </div>
         {error ? <EmptyState title="Couldn't load" description={error} /> : loading ? <Skeleton className="m-4 h-64" /> : (
-          <DataTable<Ro> columns={cols} rows={rows} keyField={(r) => r.ro} initialSort={{ key: f.basis === "opened" ? "openDate" : "closeDate", dir: "desc" }} density="compact" empty={<EmptyState title="No ROs in this range" />} />
+          <DataTable<Ro> columns={cols} rows={rows} keyField={(r) => r.ro} initialSort={{ key: f.basis === "opened" ? "openDate" : "closeDate", dir: "desc" }} density="compact" empty={<EmptyState title="No ROs in this range" description="Try a wider date range or a different basis." action={<Button variant="primary" size="sm" onClick={() => resetFilters(f)}>Show everything</Button>} />} />
         )}
       </Card>
       <p className="text-[11px] text-fg-subtle">Opened = Tekion check-in / creation date. Closed = Tekion CLOSED_TIME. Tekion's RO-list date filter is the Opened date; the financial statement and Closed-MTD scorecards use the Closed date.</p>
